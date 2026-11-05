@@ -1,0 +1,32 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "pricingtools-rmo"
+version = "0.1.0"
+description = "GLM pricing tools for non-life insurance: the Python port of the R package pricingtoolsRmO"
+readme = "README.md"
+license = {text = "MIT"}
+authors = [{name = "Robert Mooijer"}]
+requires-python = ">=3.11"
+dependencies = [
+    "numpy>=1.26",
+    "pandas>=2.1",
+    "scipy>=1.11",
+    "statsmodels>=0.14",
+    "patsy>=0.5.6",
+    "plotly>=5.18",
+]
+
+[project.optional-dependencies]
+excel = ["openpyxl>=3.1"]
+screen = ["xgboost>=2.0"]
+dev = ["pytest>=8", "openpyxl>=3.1", "xgboost>=2.0"]
+
+[tool.setuptools]
+packages = ["pricingtools_rmo"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+filterwarnings = ["default"]
