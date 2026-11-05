@@ -23,7 +23,7 @@ from statsmodels.genmod import families as F
 
 from ._core import PricingError, warn
 from ._formula import (ParsedFormula, eval_expr, expr_vars, factor_vars,
-                       patsy_env)
+                       patsy_env, r_code)
 
 _LINKS = {
     "log": F.links.Log, "identity": F.links.Identity,
@@ -163,6 +163,10 @@ class GLMFit:
             col, tmpl = nd[v], self.data[v]
             if isinstance(col.dtype, pd.CategoricalDtype):
                 col = pd.Series(np.asarray(col, dtype=object), index=nd.index)
+            # a nullable boolean (what coerce_like() returns for a logical
+            # column) is a dtype patsy cannot read
+            if isinstance(col.dtype, pd.BooleanDtype):
+                col = pd.Series(np.asarray(col, dtype=object), index=nd.index)
             if pd.api.types.is_bool_dtype(tmpl) and not pd.api.types.is_bool_dtype(col):
                 m = {"TRUE": True, "True": True, "true": True, "1": True,
                      "FALSE": False, "False": False, "false": False, "0": False}
@@ -278,6 +282,12 @@ class GLMFit:
     def __repr__(self):
         return ("GLMFit(%s, family=%s, link=%s, n=%d)"
                 % (self.formula, self.family, self.link, self.nobs))
+
+
+def _r_num(x):
+    """A number as R's format() writes it, up to 7 significant digits."""
+    return np.format_float_positional(float(x), precision=7, unique=False,
+                                      fractional=False, trim="-")
 
 
 def _num_str(z):
@@ -476,6 +486,11 @@ def fit_glm(formula, data, family="poisson", link=None, weights=None,
     m.theta = theta
     m.theta_fixed = theta_fixed
     m.sm_family = res.model.family
+    # the family as R names it, for tables and titles
+    m.family_label = {"gamma": "Gamma", "tweedie": "Tweedie",
+                      "inverse.gaussian": "inverse.gaussian"}.get(family, family)
+    if family == "negbin":
+        m.family_label = "Negative Binomial(%s)" % _r_num(round(theta, 4))
     m.weights_expr = weights if isinstance(weights, str) else None
     m.data = d
     m.design_info = di
@@ -519,6 +534,19 @@ def fit_glm(formula, data, family="poisson", link=None, weights=None,
                     cols.append(v)
         m.terms.append(Term(t.name(), [f.code for f in t.factors],
                             di.term_slices[t], cols))
+    # R's terms(): by degree, in formula order within a degree, and the
+    # factors of an interaction in their order of first appearance in the
+    # formula, so labels read "REGIO:LEEFTIJD" where R writes that. patsy
+    # orders its design columns its own way; Term.cols still points there.
+    first, pos = {}, {}
+    for i, t in enumerate(desc.rhs_termlist):
+        for f in t.factors:
+            first.setdefault(f.code, len(first))
+        pos.setdefault(frozenset(f.code for f in t.factors), i)
+    for t in m.terms:
+        t.factors = sorted(t.factors, key=lambda c: first.get(c, len(first)))
+        t.label = ":".join(r_code(c) for c in t.factors)
+    m.terms.sort(key=lambda t: (t.order, pos.get(frozenset(t.factors), len(pos))))
     m.has_intercept = any(not t.factors for t in di.terms)
     m.xlevels = {}
     for f, fi in di.factor_infos.items():

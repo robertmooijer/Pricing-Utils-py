@@ -66,7 +66,7 @@ def r_cut(x, breaks, labels=None, right=True, include_lowest=False,
     """R's cut(): right-closed bins labelled "(17,24]", as a pandas
     Categorical whose categories keep the order of the breaks."""
     x = np.asarray(x, dtype=float)
-    breaks = np.asarray(breaks, dtype=float)
+    breaks = np.atleast_1d(np.asarray(breaks, dtype=float))
     if breaks.size == 1:
         nb = int(breaks[0])
         lo, hi = np.nanmin(x), np.nanmax(x)
@@ -278,3 +278,15 @@ def patsy_env():
 def factor_vars(code: str) -> list:
     """Data columns behind one patsy factor code, e.g. 'ns(LEEFTIJD, 3)'."""
     return expr_vars(code)
+
+
+def r_code(code: str) -> str:
+    """A patsy factor code written back the way R deparses the term:
+    c() for _c_(), backticks for Q("..."), ^ for **, TRUE/FALSE."""
+    s = re.sub(r"""\bQ\((['"])(.*?)\1\)""",
+               lambda m: m.group(2) if m.group(2).isidentifier()
+               else "`" + m.group(2) + "`", code)
+    s = s.replace("_c_(", "c(").replace(" ** ", "^").replace("**", "^")
+    s = re.sub(r"\bTrue\b", "TRUE", s)
+    s = re.sub(r"\bFalse\b", "FALSE", s)
+    return s

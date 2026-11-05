@@ -65,3 +65,15 @@ def attach(fig, name, value):
     back as ``fig.<name>``."""
     object.__setattr__(fig, name, value)
     return fig
+
+
+def set_config(fig, filename):
+    """The modebar settings R attaches with plotly::config(). Python plotly
+    passes config at render time, so it is kept on the figure as
+    ``fig.pricing_config`` and used by fig.show / the report:
+    ``fig.show(config=fig.pricing_config)``."""
+    cfg = {"displayModeBar": True,
+           "modeBarButtonsToRemove": ["lasso2d", "select2d"],
+           "toImageButtonOptions": {"format": "png", "filename": filename}}
+    object.__setattr__(fig, "pricing_config", cfg)
+    return fig

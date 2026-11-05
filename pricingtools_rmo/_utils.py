@@ -47,7 +47,7 @@ def as_df(x):
 def check_range(rng, fn, arg="y_range"):
     if rng is None:
         return None
-    r = list(rng)
+    r = list(np.atleast_1d(rng))
     if len(r) != 2 or not all(np.isfinite(r)) or r[0] >= r[1]:
         stop(fn, ": '", arg, "' must be (lo, hi) with lo < hi.")
     return [float(r[0]), float(r[1])]
@@ -850,8 +850,9 @@ def grouping_column(data, pv, a, model_freq, model_sev, fn):
                  "); ", " and ".join(bits), ", the outer band(s) of '", a, "'.",
                  (" '" + pv + "' is also a continuous term of the "
                   + " and ".join(also) + " model, which extrapolates beyond the "
-                  "range it was fitted on; capping the values keeps it from "
-                  "doing so.") if also else "")
+                  "range it was fitted on; capping the values, pmin(pmax("
+                  + pv + ", " + _fmt(keys[0]) + "), " + _fmt(keys[-1])
+                  + "), keeps it from doing so.") if also else "")
     else:
         xt = [None if pd.isna(v) else _txt(v) for v in x]
         vals = np.array([mp.get(t) if t is not None else None for t in xt],
