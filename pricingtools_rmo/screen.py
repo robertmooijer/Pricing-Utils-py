@@ -516,6 +516,8 @@ def screen_features(model, features=None, split=(0.6, 0.2, 0.2), max_depth=2,
     nm = layout_tr.names
 
     def mk_from(x, y, w, margin):
+        # [SCR-01] the GLM's log prediction is the booster's base_margin,
+        # so it can only model what the GLM leaves behind.
         # columns go in unnamed: xgboost refuses '[', ']' and '<' in feature
         # names, which a level such as "[18,25)" contains. Gain is mapped
         # back by column position instead.

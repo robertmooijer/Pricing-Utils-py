@@ -144,6 +144,9 @@ class GLMFit:
             v = np.asarray(eval_expr(e, data), dtype=float)
             if v.ndim == 0:
                 v = np.repeat(float(v), n)
+            # [OFF-03] An offset that does not give one value per row of
+            # this data cannot be neutralised; recycling it would give a
+            # confidently wrong number, so it is refused.
             if len(v) != n:
                 raise PricingError(
                     "pricingtools: the model's offset (%s) does not evaluate "
