@@ -96,7 +96,8 @@ distribution is called `pricingtools-rmo`, the import name is
 `pricingtools_rmo`.
 
 ```sh
-cd pricingtools-py
+git clone https://github.com/robertmooijer/Pricing-Utils-py.git
+cd Pricing-Utils-py
 python -m venv .venv
 .venv\Scripts\activate            # Windows; on Linux/macOS: source .venv/bin/activate
 

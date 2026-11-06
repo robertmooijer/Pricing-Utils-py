@@ -19,6 +19,10 @@ dependencies = [
     "plotly>=5.18",
 ]
 
+[project.urls]
+Repository = "https://github.com/robertmooijer/Pricing-Utils-py"
+"R package" = "https://github.com/robertmooijer/Pricing-Utils"
+
 [project.optional-dependencies]
 excel = ["openpyxl>=3.1"]
 screen = ["xgboost>=2.0"]
