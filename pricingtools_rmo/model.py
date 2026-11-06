@@ -368,6 +368,7 @@ def _nb_loglik(th, mu, y, w):
                        + y * np.log(mu + (y == 0)) - (th + y) * np.log(th + mu)))
 
 
+# [PY-01] the package fits the model, so the model keeps its offsets and data
 def fit_glm(formula, data, family="poisson", link=None, weights=None,
             var_power=1.5, theta=None, maxiter=100, tol=1e-10):
     """Fit a GLM from an R-style formula.
@@ -537,6 +538,7 @@ def fit_glm(formula, data, family="poisson", link=None, weights=None,
                     cols.append(v)
         m.terms.append(Term(t.name(), [f.code for f in t.factors],
                             di.term_slices[t], cols))
+    # [PY-04]
     # R's terms(): by degree, in formula order within a degree, and the
     # factors of an interaction in their order of first appearance in the
     # formula, so labels read "REGIO:LEEFTIJD" where R writes that. patsy

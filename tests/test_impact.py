@@ -235,6 +235,146 @@ def test_offsets_from_the_formula_add_up(dol):
     assert set(U.offset_vars(m)) == {"Exposure", "const"}
 
 
+def _dol_full(dol):
+    rng = np.random.default_rng(53)
+    return dol.assign(Maanden=dol.Exposure * 12,
+                      SCHADELAST=dol.AantalClaims * rng.gamma(3, 700, len(dol)))
+
+
+def _truth(m, d):
+    """exp(intercept + R effect): the rate with every offset taken out."""
+    return np.exp(m.coef.iloc[0]
+                  + m.coef.iloc[1] * (d.R == "Z").to_numpy(dtype=float))
+
+
+def test_offset_value_evaluates_the_models_own_offset(dol):
+    d = _dol_full(dol)
+    m_log = fit_glm("AantalClaims ~ R + offset(log(Exposure))", d)
+    np.testing.assert_allclose(U.offset_value(m_log, d), np.log(d.Exposure),
+                               rtol=1e-12)
+    m_expr = fit_glm("AantalClaims ~ R + offset(log(Maanden / 12))", d)
+    np.testing.assert_allclose(U.offset_value(m_expr, d), np.log(d.Maanden / 12),
+                               rtol=1e-12)
+    m_two = fit_glm("AantalClaims ~ R + offset(log(Exposure)) + offset(0.1)", d)
+    np.testing.assert_allclose(U.offset_value(m_two, d), np.log(d.Exposure) + 0.1,
+                               rtol=1e-12)
+    m_none = fit_glm("AantalClaims ~ R", d)
+    np.testing.assert_array_equal(U.offset_value(m_none, d), np.zeros(len(d)))
+
+
+def test_offset_is_log_distinguishes_a_log_offset_from_any_other(dol):
+    d = _dol_full(dol)
+    assert U.offset_is_log(fit_glm("AantalClaims ~ R + offset(log(Exposure))", d)) is True
+    assert U.offset_is_log(
+        fit_glm("AantalClaims ~ R + offset(log(Maanden / 12))", d)) is True
+    assert U.offset_is_log(fit_glm("AantalClaims ~ R + offset(Exposure)", d)) is False
+    assert U.offset_is_log(fit_glm("AantalClaims ~ R", d)) is None
+
+
+def test_the_usual_log_link_with_a_log_offset_is_unchanged(dol):
+    # the whole point of deriving is that the common case must not move
+    m = fit_glm("AantalClaims ~ R + offset(log(Exposure))", dol)
+    r = U.model_rate(m, dol, "Exposure", "t")
+    np.testing.assert_allclose(r, _truth(m, dol), rtol=1e-10)
+    # and it still equals predicting at exposure = 1
+    np.testing.assert_allclose(r, m.predict(dol.assign(Exposure=1.0)), rtol=1e-10)
+
+
+def test_an_offset_without_a_log_is_neutralised_correctly(dol):
+    # setting Exposure to 1 left the offset at 1 instead of 0, so every rate
+    # came out a factor e too high
+    m = fit_glm("AantalClaims ~ R + offset(Exposure)", dol)
+    r = U.model_rate(m, dol, "Exposure", "t")
+    np.testing.assert_allclose(r, _truth(m, dol), rtol=1e-10)
+    old = m.predict(dol.assign(Exposure=1.0))
+    np.testing.assert_allclose(old / r, np.e, rtol=1e-8)  # the old bug
+
+
+def test_an_offset_on_an_expression_is_neutralised_correctly(dol):
+    d = _dol_full(dol)
+    m = fit_glm("AantalClaims ~ R + offset(log(Maanden / 12))", d)
+    # it also says the rate is per unit of Maanden / 12; that is not the point here
+    r = quiet(U.model_rate, m, d, "Exposure", "t")
+    np.testing.assert_allclose(r, _truth(m, d), rtol=1e-10)
+    old = m.predict(d.assign(Maanden=1.0))
+    np.testing.assert_allclose(r / old, 12, rtol=1e-8)  # the old bug
+
+
+def test_a_non_log_link_removes_the_offset_and_says_what_that_means(dol):
+    rng = np.random.default_rng(54)
+    dg = dol.assign(y=5 + 2 * (dol.R == "Z").to_numpy(dtype=float)
+                    + dol.Exposure + rng.normal(0, .3, len(dol)))
+    m = fit_glm("y ~ R + offset(Exposure)", dg, family="gaussian")
+    with pytest.warns(PricingWarning, match="not a multiplicative exposure"):
+        r = U.model_rate(m, dg, "Exposure", "t")
+    manual = m.coef.iloc[0] + m.coef.iloc[1] * (dg.R == "Z").to_numpy(dtype=float)
+    np.testing.assert_allclose(r, manual, rtol=1e-10)
+
+
+def test_a_model_without_an_offset_is_untouched(dol):
+    d = _dol_full(dol)
+    ds = d[d.AantalClaims > 0].copy()
+    ds["AvgLoss"] = ds.SCHADELAST / ds.AantalClaims
+    m = fit_glm("AvgLoss ~ R", ds, family="gamma", weights="AantalClaims")
+    np.testing.assert_allclose(U.model_rate(m, ds, "Exposure", "t"),
+                               m.predict(ds), rtol=1e-12)
+
+
+def test_the_rating_table_intercept_follows_the_models_own_offset(dol):
+    # the factors are ratios and cancel the offset either way; the intercept
+    # is the one number that carries it
+    from pricingtools_rmo.rating_table import make_rating_table
+    d = _dol_full(dol)
+    m = fit_glm("AantalClaims ~ R + offset(log(Maanden / 12))", d)
+    tb = quiet(make_rating_table, m, None, data=d, exposure_col="Exposure")
+    assert tb.attrs["intercept_frequency"] == pytest.approx(
+        np.exp(m.coef.iloc[0]), rel=1e-10)
+    # and the reconstruction identity still holds against a real prediction
+    d1 = d.iloc[[0]].assign(R=pd.Categorical(["Z"], categories=["N", "Z"]),
+                            Maanden=12.0)          # offset = log(1) = 0
+    s = tb[(tb.Variable == "R") & tb.Group.isna()]
+    recon = (tb.attrs["intercept_frequency"]
+             * s.Factor_Frequency[s.Level == "Z"].iloc[0])
+    assert recon == pytest.approx(m.predict(d1)[0], rel=1e-10)
+
+
+def test_an_offset_that_cannot_be_evaluated_per_row_is_refused(dol):
+    # [OFF-03] R's case is a pre-computed vector passed as glm()'s offset
+    # argument. fit_glm has no such argument, so the two ways an offset can
+    # fail to give one value per scored row are a column the scoring data
+    # lacks and an expression with a fixed length
+    dd = dol.assign(off=np.log(dol.Exposure), BM=np.where(dol.R == "Z", .8, 1.))
+    m = fit_glm("AantalClaims ~ R + offset(off)", dd)
+    np.testing.assert_allclose(quiet(U.model_rate, m, dd, "Exposure", "t"),
+                               _truth(m, dd), rtol=1e-10)
+    # An offset that comes out of the rate is never evaluated (R has to
+    # evaluate it to subtract it, and stops when it cannot), so a scoring
+    # data set without its column still gives the exact rate
+    np.testing.assert_allclose(
+        quiet(U.model_rate, m, dd.drop(columns="off"), "Exposure", "t"),
+        _truth(m, dd), rtol=1e-10)
+    # one that stays in the rate has to be evaluated, and is refused with
+    # the package's own message rather than a bare name error
+    mb = fit_glm("AantalClaims ~ R + offset(log(Exposure)) + offset(log(BM))", dd)
+    with pytest.raises(PricingError, match="could not be evaluated"):
+        U.model_rate(mb, dd.drop(columns="BM"), "Exposure", "t")
+    np.testing.assert_allclose(
+        U.model_rate(mb, dd.drop(columns="BM"), "Exposure", "t",
+                     keep_offsets=False), _truth(mb, dd), rtol=1e-10)
+
+    # an offset whose length cannot line up with the rows being scored
+    mf = fit_glm("AantalClaims ~ R + offset(log(Exposure)) + offset(np.repeat(0.1, %d))"
+                 % len(dol), dol)
+    short = dol.iloc[:50]
+    with pytest.raises(PricingError, match="one value per row"):
+        U.offset_value(mf, short)
+    with pytest.raises(PricingError, match="could not be evaluated"):
+        U.model_rate(mf, short, "Exposure", "t")
+    # on the rows it was fitted on it is simply part of the model
+    np.testing.assert_allclose(U.offset_value(mf, dol), np.log(dol.Exposure) + 0.1,
+                               rtol=1e-12)
+
+
 def _bm_book(seed, nk, with_l=False):
     rng = np.random.default_rng(seed)
     d = pd.DataFrame({"R": pd.Categorical(rng.choice(["N", "Z"], nk),

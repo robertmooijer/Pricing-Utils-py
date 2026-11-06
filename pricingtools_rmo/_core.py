@@ -13,6 +13,7 @@ from __future__ import annotations
 import warnings
 
 
+# [PY-09]
 class PricingError(ValueError):
     """An input the package refuses rather than guess at (R's stop())."""
 
@@ -39,6 +40,7 @@ def message(*parts, stacklevel=3):
                   stacklevel=stacklevel)
 
 
+# [PY-06]
 class Result(dict):
     """A dict whose items can also be read as attributes, so a result reads
     like R's list: ``imp.summary`` or ``imp["summary"]``."""
@@ -60,6 +62,7 @@ class Result(dict):
         return list(self.keys())
 
 
+# [PY-06]
 def attach(fig, name, value):
     """Attach a data table to a plotly figure, as R's attr(p, name). Read it
     back as ``fig.<name>``."""

@@ -341,6 +341,7 @@ def detect_interactions(model, vars=None, n_bins=10, min_claims=30, n_sim=200,
     # [DATA-06]
     model = U.as_na_omit(model)
     # [CONV-08]
+    # [PY-05] a Generator per call, never the global numpy random state
     rng = np.random.default_rng(seed)
 
     parts = U.glm_ae_parts(model, fn)

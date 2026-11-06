@@ -228,6 +228,7 @@ class _Poly:
         return Z[:, 1:]
 
 
+# [PY-03] knots learned on the fit data and reused on new data, as in R
 ns = stateful_transform(_NS)
 bs = stateful_transform(_BS)
 poly = stateful_transform(_Poly)

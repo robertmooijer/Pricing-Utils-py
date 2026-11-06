@@ -122,6 +122,7 @@ def _anyna(x):
     return bool(pd.Series(x, dtype=object).isna().any()) if len(x) else False
 
 
+# [PY-04]
 def _r_terms(model):
     """The model's terms as R's terms() orders them: by degree, in formula
     order within a degree, and the factors of an interaction in their order

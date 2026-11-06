@@ -121,6 +121,7 @@ R_FUNCTIONS = {
 _BACKTICK = re.compile(r"`([^`]*)`")
 
 
+# [PY-02]
 def translate(expr: str, colfun: str = "Q") -> str:
     """R expression text to Python: backticks, ^, TRUE/FALSE, named args."""
     s = _BACKTICK.sub(lambda m: '%s("%s")' % (colfun, m.group(1)), expr)
@@ -174,6 +175,7 @@ def split_top(text: str, seps: str):
     return [(s, t) for s, t in parts if t]
 
 
+# [PY-02]
 class ParsedFormula:
     """An R formula split into response, patsy right-hand side and offsets."""
 

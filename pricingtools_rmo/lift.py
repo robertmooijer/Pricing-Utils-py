@@ -139,6 +139,7 @@ def model_lift(model_freq=None, model_sev=None, data=None,
     U.check_boot(n_boot, conf_level, fn)
     n_boot = int(n_boot)
     # [CONV-08]
+    # [PY-05] a Generator per call, never the global numpy random state
     rng = np.random.default_rng(seed)
 
     # [RATE-07]
@@ -436,6 +437,7 @@ def double_lift(data,
     U.check_boot(n_boot, conf_level, fn)
     n_boot = int(n_boot)
     # [CONV-08]
+    # [PY-05] a Generator per call, never the global numpy random state
     rng = np.random.default_rng(seed)
     y_range = U.check_range(y_range, fn)
     if n_bins < 2:

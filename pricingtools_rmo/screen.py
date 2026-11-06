@@ -323,6 +323,7 @@ def screen_features(model, features=None, split=(0.6, 0.2, 0.2), max_depth=2,
         stop("screen_features: 'split' must be three positive shares summing "
              "to 1.")
     # [CONV-08]
+    # [PY-05] a Generator per call, never the global numpy random state
     rng = np.random.default_rng(seed)
     if nthread is None:
         nthread = U.default_nthread()

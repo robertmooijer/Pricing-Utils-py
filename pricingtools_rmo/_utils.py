@@ -14,7 +14,8 @@ import pandas as pd
 from scipy import integrate, stats
 
 from ._core import PricingError, Result, message, stop, warn
-from ._formula import R_FUNCTIONS, eval_expr, expr_vars, r_cut, translate
+from ._formula import (R_FUNCTIONS, FormulaError, eval_expr, expr_vars, r_cut,
+                       translate)
 
 # ---- input handling ------------------------------------------------------------
 
@@ -475,9 +476,11 @@ def model_rate(model, data, exposure_col, fn, keep_offsets=True, label=""):
         warn(fn, ": the model offsets on '", ", ".join(ov), "' rather than on '",
              exposure_col, "'. The rates are therefore per unit of that "
              "variable, while the weighting uses '", exposure_col, "'.")
+    # [OFF-03] only the offsets that stay in are evaluated on this data; one
+    # that cannot be (a column the data lacks, a fixed length) is refused
     try:
         return predict_no_offset(model, data, sp.drop)
-    except PricingError as e:
+    except (PricingError, FormulaError) as e:
         stop(fn, ": the model has an offset that could not be evaluated on "
                  "this data, so the result would not be a rate per unit of "
                  "exposure. ", str(e))
@@ -863,6 +866,7 @@ def grouping_column(data, pv, a, model_freq, model_sev, fn):
             if have:
                 # [MV-05] a column the caller supplied keeps its value where
                 # the model's data cannot check it
+                # [PY-07] R stops here; the deviation is in TECHNICAL.md
                 pass
             else:
                 stop(fn, ": the value(s) ", ", ".join(miss[:5]),

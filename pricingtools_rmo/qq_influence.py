@@ -206,6 +206,7 @@ def plot_glm_qq(model, n_max=5000, band=True, seed=None, title=None,
         stop("plot_glm_qq: 'n_max' must be at least 10.")
     y_range = U.check_range(y_range, "plot_glm_qq")
     # [CONV-08]
+    # [PY-05] a Generator per call, never the global numpy random state
     rng = np.random.default_rng(seed)
 
     r = _quantile_residuals(model, "plot_glm_qq", rng)
@@ -389,6 +390,7 @@ def plot_glm_influence(model, n_label=10, data_cols=None, n_max=5000,
         stop("plot_glm_influence: 'n_label' must be at least 1.")
     y_range = U.check_range(y_range, "plot_glm_influence")
     # [CONV-08]
+    # [PY-05] a Generator per call, never the global numpy random state
     rng = np.random.default_rng(seed)
 
     tr = U.glm_training_data(model, "plot_glm_influence")
