@@ -14,15 +14,17 @@ Five models, one R run:
 * Gamma with a log link and prior weights (a severity model).
 * Negative binomial against MASS::glm.nb: theta and the fit.
 * Gaussian with an identity link and an offset.
+* Inverse Gaussian with a log link and prior weights.
 
 Coefficient names differ (patsy against R), so the standard errors are
 compared sorted; everything else is compared value by value.
 
 Measured: fitted values and predictions agree to about 2e-14, deviance and
 AIC to 1e-15, standard errors to 8e-12 and theta to 5e-14, except the
-Gamma fit, whose fitted values agree to 1e-8 while its deviance agrees to
-1e-15: the optimum is flat, and the two IRLS loops stop on marginally
-different points of it. The tolerances below sit just above that."""
+Gamma and inverse Gaussian severity fits, whose fitted values agree to
+about 2e-8 while their deviance agrees to 1e-15: the optimum is flat, and
+the two IRLS loops stop on marginally different points of it. The
+tolerances below sit just above that."""
 import warnings
 
 import numpy as np
@@ -36,7 +38,7 @@ from ._r import as_float, requires_r, run_r
 pytestmark = [pytest.mark.parity, requires_r]
 
 RTOL = 1e-10
-RTOL_FIT = {"gamma": 1e-7}      # see the module docstring
+RTOL_FIT = {"gamma": 1e-7, "ig": 1e-7}      # see the module docstring
 
 F_FREQ = ("AantalClaims ~ cut(LEEFTIJD, c(17, 30, 50, 85)) + ns(GEWICHT, 3)"
           " + factor(BOEKJAAR) + REGIO + REGIO:LEEFTIJD"
@@ -44,6 +46,7 @@ F_FREQ = ("AantalClaims ~ cut(LEEFTIJD, c(17, 30, 50, 85)) + ns(GEWICHT, 3)"
 F_SEV = "AvgLoss ~ log(GEWICHT) + REGIO + factor(BOEKJAAR)"
 F_NB = "AantalClaims ~ LEEFTIJD + REGIO + offset(log(Exposure))"
 F_GAUSS = "y ~ LEEFTIJD + REGIO + offset(Exposure)"
+F_IG = "AvgLoss ~ LEEFTIJD + REGIO"
 
 R_CODE = """
 library(splines)
@@ -61,7 +64,9 @@ out$gamma <- fit_out(glm(%s, family = Gamma(link = "log"), data = s,
 mnb <- MASS::glm.nb(%s, data = d, control = ctl)
 out$nb <- c(fit_out(mnb, nd), theta = mnb$theta)
 out$gauss <- fit_out(glm(%s, family = gaussian(), data = d, control = ctl), nd)
-""" % (F_FREQ, F_FREQ, F_SEV, F_NB, F_GAUSS)
+out$ig <- fit_out(glm(%s, family = inverse.gaussian(link = "log"), data = s,
+                      weights = AantalClaims, control = ctl), nd)
+""" % (F_FREQ, F_FREQ, F_SEV, F_NB, F_GAUSS, F_IG)
 
 
 @pytest.fixture(scope="module")
@@ -114,7 +119,9 @@ def py_fits(frames):
             "gamma": fit_glm(F_SEV, s, family="gamma", weights="AantalClaims",
                              tol=1e-14),
             "nb": fit_glm(F_NB, d, family="negbin", tol=1e-14),
-            "gauss": fit_glm(F_GAUSS, d, family="gaussian", tol=1e-14)}
+            "gauss": fit_glm(F_GAUSS, d, family="gaussian", tol=1e-14),
+            "ig": fit_glm(F_IG, s, family="inverse.gaussian",
+                          weights="AantalClaims", tol=1e-14)}
 
 
 def _close(a, b, rtol=RTOL):
@@ -122,7 +129,10 @@ def _close(a, b, rtol=RTOL):
                                rtol=rtol, equal_nan=True)
 
 
-@pytest.mark.parametrize("which", ["pois", "quasi", "gamma", "nb", "gauss"])
+MODELS = ["pois", "quasi", "gamma", "nb", "gauss", "ig"]
+
+
+@pytest.mark.parametrize("which", MODELS)
 def test_fit_glm_matches_r_on_the_fit(which, r_out, py_fits):
     r, m = r_out[which], py_fits[which]
     assert m.rank == r["rank"]
@@ -139,7 +149,7 @@ def test_fit_glm_matches_r_on_the_fit(which, r_out, py_fits):
         _close(m.aic, r["aic"])
 
 
-@pytest.mark.parametrize("which", ["pois", "quasi", "gamma", "nb", "gauss"])
+@pytest.mark.parametrize("which", MODELS)
 def test_fit_glm_predicts_new_data_as_r_does(which, r_out, py_fits, frames):
     # NA where cut() has no band, linear extrapolation past the ns() knots
     pred = py_fits[which].predict(frames["nd"])

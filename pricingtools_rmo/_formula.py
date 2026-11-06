@@ -23,11 +23,13 @@ import pandas as pd
 import patsy
 from patsy.builtins import C, I, Q
 
+from ._core import PricingError
 from .splines import bs, ns, poly
 
 
-class FormulaError(ValueError):
-    pass
+class FormulaError(PricingError):
+    """A formula or expression that cannot be read; a PricingError, as every
+    error the package raises on its input is."""
 
 
 # ---- R functions available in formulas and expressions ----------------------
@@ -187,6 +189,9 @@ class ParsedFormula:
         self.response = lhs.strip()
         if not self.response:
             raise FormulaError("The formula has no response: " + formula)
+        if re.search(r"[+\-*:/^]\s*$", rhs):
+            # R: "unexpected end of input"; patsy would drop the operator
+            raise FormulaError("The formula ends in an operator: " + formula)
         terms, offsets = [], []
         for sign, t in split_top(rhs, "+-"):
             if re.fullmatch(r"offset\s*\((.*)\)", t, flags=re.S):
@@ -291,4 +296,12 @@ def r_code(code: str) -> str:
     s = s.replace("_c_(", "c(").replace(" ** ", "^").replace("**", "^")
     s = re.sub(r"\bTrue\b", "TRUE", s)
     s = re.sub(r"\bFalse\b", "FALSE", s)
+    # named arguments as R deparses them: R's dotted names, spaces round '='
+    s = re.sub(r"\b(boundary_knots|include_lowest|dig_lab)(?=\s*=(?!=))",
+               lambda m: _R_ARG_NAMES[m.group(1)], s)
+    s = re.sub(r"(?<=[\w.])\s*=(?!=)\s*", " = ", s)
     return s
+
+
+_R_ARG_NAMES = {"boundary_knots": "Boundary.knots",
+                "include_lowest": "include.lowest", "dig_lab": "dig.lab"}

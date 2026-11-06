@@ -468,10 +468,8 @@ def screen_features(model, features=None, split=(0.6, 0.2, 0.2), max_depth=2,
     # baseline meets the other levels in the validation or test split. The
     # predictions are therefore part of the attempt.
     try:
-        if model.weights_expr is None and np.any(model.prior_weights != 1):
-            # prior weights given as an array cannot follow the rows into
-            # a refit (R's update() fails on them the same way)
-            raise ValueError("prior weights cannot be re-evaluated")
+        # prior weights given as an array cannot follow the rows into a
+        # refit; refit() refuses them, as R's update() does
         base = model.refit(d_tr)
         mu_tr, mu_va, mu_te = (mu_of(base, d_tr), mu_of(base, d_va),
                                mu_of(base, d_te))

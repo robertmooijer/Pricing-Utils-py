@@ -272,6 +272,15 @@ class GLMFit:
 
     def refit(self, data):
         """The same model fitted on other data, as R's update(model, data =)."""
+        if self.weights_array:
+            # an array belongs to the rows it was fitted on; refitting with
+            # weight 1 would change the model without a word (R's update()
+            # stops on such weights as well)
+            raise PricingError(
+                "pricingtools: the model's prior weights were given as an "
+                "array, so they cannot follow the rows of other data. Fit it "
+                "with the weights as a column name, e.g. "
+                "weights='AantalClaims'.")
         return fit_glm(self.formula, data, family=self.family, link=self.link,
                        weights=self.weights_expr, var_power=self.var_power,
                        theta=self.theta if self.theta_fixed else None)
@@ -384,8 +393,9 @@ def fit_glm(formula, data, family="poisson", link=None, weights=None,
     data : pandas.DataFrame
     family : str
         ``"poisson"``, ``"quasipoisson"``, ``"gamma"``, ``"gaussian"``,
-        ``"binomial"``, ``"tweedie"`` (with ``var_power``) or ``"negbin"``
-        (theta estimated as MASS::glm.nb does, or fixed with ``theta``).
+        ``"binomial"``, ``"inverse.gaussian"``, ``"tweedie"`` (with
+        ``var_power``) or ``"negbin"`` (theta estimated as MASS::glm.nb
+        does, or fixed with ``theta``).
     link : str, optional
         Defaults to ``"log"`` for every family except gaussian (identity) and
         binomial (logit). Note that R's Gamma default is the inverse link;
@@ -496,6 +506,7 @@ def fit_glm(formula, data, family="poisson", link=None, weights=None,
     if family == "negbin":
         m.family_label = "Negative Binomial(%s)" % _r_num(round(theta, 4))
     m.weights_expr = weights if isinstance(weights, str) else None
+    m.weights_array = weights is not None and not isinstance(weights, str)
     m.data = d
     m.design_info = di
     m._X_full = X
@@ -582,4 +593,8 @@ def _aic(m):
                          + 2 * p)
         if fam == "negbin":
             return float(-2 * _nb_loglik(m.theta, mu, y, w) + 2 * p + 2)
+        if fam == "inverse.gaussian":
+            sw = w.sum()
+            return float(sw * (np.log(m.deviance / sw * 2 * np.pi) + 1)
+                         + 3 * np.sum(np.log(y) * w) + 2 + 2 * p)
     return float("nan")

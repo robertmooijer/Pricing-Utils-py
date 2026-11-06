@@ -2121,9 +2121,12 @@ register entry here is written so it can be read on its own.
   expression, the training rows with their original columns and index, the
   factor levels, the terms with their data columns, and the patsy design
   info that holds the spline knots. Rows with a missing value in any
-  variable the model uses are left out, as `na.omit` does. Gamma's default
-  link is log, where R's is the inverse. A negative binomial is fitted the
-  way `MASS::glm.nb()` fits it.
+  variable the model uses are left out, as `na.omit` does. Gamma's and the
+  inverse Gaussian's default link is log, where R's are the inverse and
+  1/mu^2. A negative binomial is fitted the way `MASS::glm.nb()` fits it.
+  Prior weights given as an array, rather than a column name, are used for
+  the fit, and `refit()` and `glm_newdata_parts()` refuse the model, as
+  R's `update()` stops on such weights (`GLMFit.weights_array`).
 - **Why.** The R package reads everything off the fitted object (CONV-05):
   the offset expressions to evaluate again on other data (OFF-01, OFF-02),
   the levels to name a value the model never saw (SCORE-01), the data to
@@ -2137,15 +2140,28 @@ register entry here is written so it can be read on its own.
   `glm()` for Poisson, quasi-Poisson and Gaussian with `cut()`, `ns()`, an
   interaction and two offsets: fitted values and predictions on new data
   2e-14, deviance and AIC 1e-15, standard errors 8e-12. Negative binomial
-  against `MASS::glm.nb`: theta 5e-14, fitted values 1e-14. Gamma with a
-  log link and prior weights: deviance 1e-15, fitted values 1e-8 (a flat
-  optimum; the two IRLS loops stop on marginally different points of it).
+  against `MASS::glm.nb`: theta 5e-14, fitted values 1e-14. Gamma and
+  inverse Gaussian with a log link and prior weights: deviance 1e-15,
+  fitted values 2e-8 (a flat optimum; the two IRLS loops stop on
+  marginally different points of it).
 - **Consequence.** A model fitted elsewhere cannot be passed in; refit it
-  with `fit_glm()`. DATA-05 and DATA-06 are moot. `fit_glm()` cannot fit a
+  with `fit_glm()`. Every function that takes a model checks that it is a
+  `GLMFit` and names the argument that is not (`check_models()` in
+  `_utils.py` for the rating table, lift, impact and report functions, which
+  R does not check). DATA-05 and DATA-06 are moot. `fit_glm()` cannot fit a
   Gamma model to a constant response (statsmodels refuses the perfect fit,
   where R returns a deviance of 0), which is never a pricing case.
+- **History (Python port).** Until the README examples were verified, an
+  array of prior weights was silently replaced by weights of 1 in a refit
+  (`screen_features()`, a sampled `plot_glm_influence()`) and on new data
+  (`plot_glm_predictor(data=...)`); the model is now refused there. The
+  inverse Gaussian family was accepted but undocumented and had no AIC; it
+  now has R's AIC and a parity test.
 - **Pinned by.** `test_core.py`: `test_training_predictions_match_fitted`,
-  `test_prediction_reevaluates_offsets`, `test_rhs_vars_include_offset_vars`;
+  `test_prediction_reevaluates_offsets`, `test_rhs_vars_include_offset_vars`,
+  `test_prior_weights_given_as_an_array_are_not_dropped_on_other_rows`,
+  `test_a_model_that_is_not_a_glmfit_is_refused_by_name`,
+  `test_inverse_gaussian_is_a_family_with_an_aic`;
   `parity/test_parity_fit.py`: `test_fit_glm_matches_r_on_the_fit`,
   `test_fit_glm_predicts_new_data_as_r_does`,
   `test_the_negative_binomial_theta_matches_glm_nb`;
@@ -2206,7 +2222,9 @@ register entry here is written so it can be read on its own.
 - **Decision.** `GLMFit.terms` and `term_labels` follow R's `terms()`: by
   degree, in formula order within a degree, the factors of an interaction
   in their order of first appearance in the formula, labels written back
-  the R way (`REGIO:LEEFTIJD`, backticked names, `c()`, `^`). The rating
+  the R way (`REGIO:LEEFTIJD`, backticked names, `c()`, `^`, and named
+  arguments with R's names and spaces round `=`:
+  `ns(LEEFTIJD, knots = c(30, 50), Boundary.knots = c(18, 80))`). The rating
   table reads the terms in the same order. Tables name the family as R does
   (`family_label`: `"Gamma"`, `"Negative Binomial(1.4)"`). The design
   matrix columns and coefficient names stay patsy's (`REGIO[T.West]` where
@@ -2224,8 +2242,12 @@ register entry here is written so it can be read on its own.
 - **Evidence.** *Parity:* structure, labels and base values of the rating
   table exact.
 - **Pinned by.** `test_rating_table.py`: `test_columns_come_in_the_r_order`;
+  `test_core.py`: `test_term_labels_with_named_arguments_read_as_in_r`;
   `parity/test_parity_rating_table.py`: `test_rating_table_matches_r`;
   `parity/test_parity_diagnostics.py`: `test_glm_collinearity_table`.
+- **History (Python port).** Until the README examples were verified, named
+  arguments kept patsy's form (`knots=c(...)`, `boundary_knots=`,
+  `include_lowest=TRUE`); `r_code()` now writes them as R deparses them.
 - **History (Python port).** Added in commit `6bfaeb3` of this repository.
 
 #### PY-05 Randomness through a numpy Generator, never the global state
@@ -2356,7 +2378,10 @@ register entry here is written so it can be read on its own.
   `warnings.filterwarnings("ignore", category=PricingMessage)`. The texts
   are R's English messages with the `fn: ` prefix; examples inside them use
   Python syntax (`at={'BOEKJAAR': 2024}`), and install hints say
-  `pip install`.
+  `pip install`. A formula that cannot be read raises `FormulaError`, a
+  subclass of `PricingError`, so one `except PricingError` catches every
+  refusal; a formula ending in an operator is refused, where patsy would
+  drop the operator.
 - **Why.** CONV-03 draws the line between an error and a warning on
   whether the output is still correct, and that line has to survive the
   port, so each R condition keeps its kind. A category of its own for
@@ -2366,6 +2391,7 @@ register entry here is written so it can be read on its own.
 - **Where.** `_core.py`, `PricingError`, `PricingWarning`,
   `PricingMessage`, `stop()`, `warn()`, `message()`.
 - **Pinned by.** `test_groupings.py`: `test_anything_that_would_be_a_guess_is_refused`;
+  `test_core.py`: `test_a_formula_that_cannot_be_read_is_a_pricing_error`;
   `test_interactions.py`: `test_the_interaction_scan_is_not_fooled_by_overdispersion`
   (a `PricingMessage`); `test_rating_table.py`: `test_non_log_link_raises_a_warning`.
 
@@ -2385,7 +2411,7 @@ Same data and formulas through both packages; R fitted with a tight
 |---|---|
 | `fit_glm` vs `glm()` (Poisson, quasi-Poisson, Gaussian; `cut()`, `ns()`, an interaction, two offsets): fitted values and predictions on new data / deviance and AIC / standard errors | 2e-14 / 1e-15 / 8e-12 |
 | `fit_glm` negative binomial vs `MASS::glm.nb`: theta / fitted values | 5e-14 / 1e-14 |
-| `fit_glm` Gamma (log link, prior weights) vs `glm(Gamma("log"))`: deviance / fitted values and predictions | 1e-15 / 1e-8 (a flat optimum: both IRLS loops stop on marginally different points of it) |
+| `fit_glm` Gamma and inverse Gaussian (log link, prior weights) vs `glm()`: deviance / fitted values and predictions | 1e-15 / 2e-8 (a flat optimum: both IRLS loops stop on marginally different points of it) |
 | `make_rating_table`: Factor_* / SE_* / Uplift_* / Exposure | 1e-10 / 1e-9 / 1e-13 / 2e-15; structure, labels, base values exact |
 | `premium_impact` rates, by_level, rate change | 1e-15 to 2e-9 |
 | `model_lift` / `double_lift` tables, Gini, mad | 1e-10 / 4e-14 / 3e-10 |
@@ -2400,15 +2426,20 @@ Same data and formulas through both packages; R fitted with a tight
 ### 4.2 General differences
 
 - **Models are fitted by the package** with `fit_glm()` (statsmodels
-  underneath) instead of being any R `glm` (PY-01). Gamma's default link is
-  log, where R's is the inverse. Families: poisson, quasipoisson, gamma,
-  gaussian, binomial, tweedie, negbin.
+  underneath) instead of being any R `glm` (PY-01). Gamma's and the inverse
+  Gaussian's default link is log. Families: poisson, quasipoisson, gamma,
+  gaussian, binomial, inverse.gaussian, tweedie, negbin. Prior weights
+  given as an array are refused by a refit and on new data, as R's
+  `update()` stops on them; a column name follows the rows. Every function
+  that takes a model checks that it is a `GLMFit`, where R's rating table,
+  lift, impact and report functions do not check.
 - **R formula syntax** is supported as listed in PY-02. Not supported: `.`,
   the separate `offset =` argument (write the offset in the formula), and
   `na.exclude` (Python always fits as `na.omit`, so DATA-06 is moot).
-- **Term labels and term order follow R** (`REGIO:LEEFTIJD`); the design
-  matrix columns and coefficient names are patsy's (`REGIO[T.West]` where R
-  writes `REGIOWest`) (PY-04).
+- **Term labels and term order follow R** (`REGIO:LEEFTIJD`, named
+  arguments as `knots = c(30, 50)`); the design matrix columns and
+  coefficient names are patsy's (`REGIO[T.West]` where R writes
+  `REGIOWest`) (PY-04).
 - **Randomness uses numpy's Generator** (PY-05): bootstrap intervals, the
   simulated interaction null, randomised quantile residuals, sampling and
   boosting give other draws than R's `set.seed()` streams. Everything that
@@ -2419,8 +2450,9 @@ Same data and formulas through both packages; R fitted with a tight
   attributes are `DataFrame.attrs`; tables attached to a plot are figure
   attributes (`fig.cells`, `fig.residuals`, `fig.influential`); plotly's
   config is kept as `fig.pricing_config`.
-- **Row numbers are 0-based** (`premium_impact().policy.Row`); the
-  influence table's `Row` is the data's index label (DIAG-05).
+- **Row numbers are 0-based** (`premium_impact().policy.Row`, the row
+  `add_groupings()` names when a grouped column disagrees with the model,
+  MV-03); the influence table's `Row` is the data's index label (DIAG-05).
 - **Missing values**: R's `NA` is NaN, None or `pd.NA` depending on the
   column type.
 

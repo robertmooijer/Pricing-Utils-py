@@ -12,7 +12,7 @@ Same data and formulas through both packages; R fitted with a tight
 |---|---|
 | `fit_glm` vs `glm()` (Poisson, quasi-Poisson, Gaussian; `cut()`, `ns()`, an interaction, two offsets): fitted values and predictions on new data / deviance and AIC / standard errors | 2e-14 / 1e-15 / 8e-12 |
 | `fit_glm` negative binomial vs `MASS::glm.nb`: theta / fitted values | 5e-14 / 1e-14 |
-| `fit_glm` Gamma (log link, prior weights) vs `glm(Gamma("log"))`: deviance / fitted values and predictions | 1e-15 / 1e-8 (a flat optimum: both IRLS loops stop on marginally different points of it) |
+| `fit_glm` Gamma and inverse Gaussian (log link, prior weights) vs `glm()`: deviance / fitted values and predictions | 1e-15 / 2e-8 (a flat optimum: both IRLS loops stop on marginally different points of it) |
 | `make_rating_table`: Factor_* / SE_* / Uplift_* / Exposure | 1e-10 / 1e-9 / 1e-13 / 2e-15; structure, labels, base values exact |
 | `premium_impact` rates, by_level, rate change | 1e-15 to 2e-9 |
 | `model_lift` / `double_lift` tables, Gini, mad | 1e-10 / 4e-14 / 3e-10 |
@@ -34,9 +34,14 @@ General
   `^`, `*`, `:`, `-1`, backticked names. Not supported: `.`, the separate
   `offset =` argument (write the offset in the formula), `na.exclude`
   (Python always fits as na.omit, so DATA-06 is moot).
-- Gamma's default link is `log` (R's default is the inverse). Families:
-  poisson, quasipoisson, gamma, gaussian, binomial, tweedie, negbin.
-- Term labels and term order follow R (`REGIO:LEEFTIJD`); the design
+- Gamma's default link is `log` (R's default is the inverse), as is the
+  inverse Gaussian's. Families: poisson, quasipoisson, gamma, gaussian,
+  binomial, inverse.gaussian, tweedie, negbin.
+- Prior weights given as an array are used for the fit, but a refit or
+  new data refuses the model, as R's `update()` does; a column name follows
+  the rows.
+- Term labels and term order follow R, named arguments included
+  (`REGIO:LEEFTIJD`, `ns(LEEFTIJD, knots = c(30, 50))`); the design
   matrix columns and coefficient names are patsy's (`REGIO[T.West]` where R
   writes `REGIOWest`).
 - Randomness uses numpy's Generator: bootstrap intervals, the simulated
@@ -49,8 +54,13 @@ General
   attributes are `DataFrame.attrs`; tables attached to a plot are figure
   attributes (`fig.cells`, `fig.residuals`, `fig.influential`); plotly's
   config is kept as `fig.pricing_config` (pass it to `fig.show(config=...)`).
-- Row numbers are 0-based (`premium_impact().policy.Row`); the influence
-  table's `Row` is the data's index label.
+- Row numbers are 0-based (`premium_impact().policy.Row`, the row
+  `add_groupings()` names); the influence table's `Row` is the data's
+  index label.
+- Every function that takes a model checks that it is a `GLMFit` and names
+  the argument that is not; R's rating table, lift, impact and report
+  functions do not check. A formula that cannot be read is a
+  `FormulaError`, a `PricingError`.
 
 Per function
 - `make_plot(display="facet")` is built with plotly subplots, not

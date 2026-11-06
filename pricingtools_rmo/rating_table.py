@@ -358,6 +358,7 @@ def make_rating_table(model_freq=None, model_sev=None, data=None, grid_res=50,
         stop(_FN, ": 'base_level' must be \"first\" or \"exposure\".")
     if model_freq is None and model_sev is None:
         stop("Provide at least one model.")
+    U.check_models(_FN, model_freq=model_freq, model_sev=model_sev)
     if data is None:
         stop(_FN, ": 'data' is required.")
     data = U.as_df(data)

@@ -111,3 +111,59 @@ def test_grouping_column_derived_and_checked():
     assert list(g) == ["1", "4-5", "4-5"]
     with pytest.raises(PricingError, match="do not occur"):
         U.grouping_column(pd.DataFrame({"S": [6]}), "S", "G", m, None, "t")
+
+
+def test_prior_weights_given_as_an_array_are_not_dropped_on_other_rows(d_sev):
+    # A weights array belongs to the rows it was fitted on. A refit, or the
+    # A/E on other data, used to go on with weight 1 and so a different
+    # model; R's update() stops on such weights, and so does this.
+    m = fit_glm("AvgLoss ~ LEEFTIJD + REGIO", d_sev, family="gamma",
+                weights=d_sev.AantalClaims.to_numpy())
+    m_col = fit_glm("AvgLoss ~ LEEFTIJD + REGIO", d_sev, family="gamma",
+                    weights="AantalClaims")
+    np.testing.assert_allclose(m.fitted, m_col.fitted, rtol=1e-10)
+    with pytest.raises(PricingError, match="given as an array"):
+        m.refit(d_sev.iloc[:500])
+    with pytest.raises(PricingError, match="given as an array"):
+        U.glm_newdata_parts(m, d_sev.iloc[:500], "t")
+    # as a column name they follow the rows
+    r = m_col.refit(d_sev.iloc[:500])
+    assert r.prior_weights.sum() == d_sev.AantalClaims.iloc[:500].sum()
+
+
+def test_a_formula_that_cannot_be_read_is_a_pricing_error(dat):
+    for bad in ("AantalClaims ~ LEEFTIJD +", "AantalClaims ~ LEEFTIJD:",
+                "AantalClaims ~ .", "~ LEEFTIJD", "AantalClaims LEEFTIJD"):
+        with pytest.raises(PricingError):
+            fit_glm(bad, dat)
+
+
+def test_term_labels_with_named_arguments_read_as_in_r(dat):
+    # R deparses a term with R's argument names and spaces round '='
+    m = fit_glm("AantalClaims ~ ns(LEEFTIJD, knots = c(30, 50), "
+                "Boundary.knots = c(18, 80)) + cut(LEEFTIJD, c(17, 40, 99), "
+                "include.lowest = TRUE, dig.lab = 4) + I(LEEFTIJD == 40)"
+                " + offset(log(Exposure))", dat)
+    assert m.term_labels == [
+        "ns(LEEFTIJD, knots = c(30, 50), Boundary.knots = c(18, 80))",
+        "cut(LEEFTIJD, c(17, 40, 99), include.lowest = TRUE, dig.lab = 4)",
+        "I(LEEFTIJD == 40)"]
+
+
+def test_a_model_that_is_not_a_glmfit_is_refused_by_name(dat, m_freq):
+    from pricingtools_rmo.impact import premium_impact
+    from pricingtools_rmo.lift import model_lift
+    from pricingtools_rmo.rating_table import make_rating_table
+    with pytest.raises(PricingError, match="'model_sev' must be a glm object"):
+        make_rating_table(m_freq, "a model", data=dat)
+    with pytest.raises(PricingError, match="'model_freq' must be a glm object"):
+        model_lift({"coef": 1}, None, data=dat)
+    with pytest.raises(PricingError, match="'model_freq_old' must be a glm object"):
+        premium_impact(dat, model_freq_new=m_freq, model_freq_old=42)
+
+
+def test_inverse_gaussian_is_a_family_with_an_aic(d_sev):
+    m = fit_glm("AvgLoss ~ LEEFTIJD + REGIO", d_sev, family="inverse.gaussian",
+                weights="AantalClaims")
+    assert m.link == "log"
+    assert np.isfinite(m.aic)

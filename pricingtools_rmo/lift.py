@@ -133,6 +133,7 @@ def model_lift(model_freq=None, model_sev=None, data=None,
     fn = "model_lift"
     if model_freq is None and model_sev is None:
         stop("model_lift: provide at least one model.")
+    U.check_models(fn, model_freq=model_freq, model_sev=model_sev)
     if not isinstance(keep_offsets, (bool, np.bool_)):
         stop("model_lift: 'keep_offsets' must be TRUE or FALSE.")
     keep_offsets = bool(keep_offsets)
@@ -428,6 +429,8 @@ def double_lift(data,
     model_lift, premium_impact
     """
     fn = "double_lift"
+    U.check_models(fn, model_freq_new=model_freq_new, model_sev_new=model_sev_new,
+                   model_freq_old=model_freq_old, model_sev_old=model_sev_old)
     if old_premium_basis not in ("amount", "rate"):
         stop(fn, ": 'old_premium_basis' should be one of \"amount\", "
                  "\"rate\".")

@@ -104,6 +104,18 @@ def _txt(v):
 # ---- the model's own data ------------------------------------------------------
 
 
+def check_models(fn, **models):
+    """Every model given must be a GLMFit, as the plot and diagnostic
+    functions already require. R's rating table, lift, impact and report
+    functions do not check and fail on the first attribute they read; here
+    they say what is wrong."""
+    from .model import GLMFit
+    for name, m in models.items():
+        if m is not None and not isinstance(m, GLMFit):
+            stop(fn, ": '", name, "' must be a glm object (a GLMFit from "
+                 "fit_glm()), not ", type(m).__name__, ".")
+
+
 def as_na_omit(model):
     """[DATA-06] In Python a model is always fitted as with na.omit."""
     return model
@@ -145,6 +157,10 @@ def glm_newdata_parts(model, newdata, fn="pricingtools"):
         stop(fn, ": no row of 'data' is usable; every row has a missing value "
                  "in one of the model's variables.")
     y = np.asarray(eval_expr(model.parsed.response, d), dtype=float)
+    if getattr(model, "weights_array", False):
+        stop(fn, ": the model's prior weights were given as an array, so they "
+                 "cannot be evaluated on 'data'. Fit it with the weights as a "
+                 "column name, e.g. weights='AantalClaims'.")
     if model.weights_expr is None:
         pw = np.ones(len(d))
     else:
@@ -495,6 +511,8 @@ def old_new_rates(data, model_freq_new, model_sev_new, model_freq_old,
         divisor_col = exposure_col
     if model_freq_new is None and model_sev_new is None:
         stop(fn, ": provide at least one NEW model.")
+    check_models(fn, model_freq_new=model_freq_new, model_sev_new=model_sev_new,
+                 model_freq_old=model_freq_old, model_sev_old=model_sev_old)
     has_old = model_freq_old is not None or model_sev_old is not None
     if not has_old and old_premium_col is None:
         stop(fn, ": provide old models or 'old_premium_col'.")
@@ -900,7 +918,7 @@ def grouping_column(data, pv, a, model_freq, model_sev, fn):
         b = bad[0]
         stop(fn, ": '", a, "' does not mean the same thing everywhere: in ",
              len(bad), " row(s) of 'data' it disagrees with the data the ",
-             owner_nm, " model was fitted on; row ", b + 1, " has '", pv,
+             owner_nm, " model was fitted on; row ", b, " (0-based) has '", pv,
              "' = ", _txt(x.iloc[b]), " and '", a, "' = ", cur[b],
              ", where the model's data says ", new[b], ".")
     return data[a]

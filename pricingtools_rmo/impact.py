@@ -160,6 +160,8 @@ def premium_impact(data,
     a different calculation.
     """
     fn = "premium_impact"
+    U.check_models(fn, model_freq_new=model_freq_new, model_sev_new=model_sev_new,
+                   model_freq_old=model_freq_old, model_sev_old=model_sev_old)
     if old_premium_basis not in ("amount", "rate"):
         stop(fn, ": 'old_premium_basis' should be one of \"amount\", "
                  "\"rate\".")

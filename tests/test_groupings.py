@@ -128,7 +128,8 @@ def test_anything_that_would_be_a_guess_is_refused(g):
     # a column already present is checked, never overwritten
     b = new_pf()
     b["MERK_GR_F"] = ["BMW_MERCEDES", "MERCEDES", "NISSAN", "TOYOTA", "BMW_MERCEDES"]
-    with pytest.raises(PricingError, match="row 2 has 'MERK' = MERCEDES"):
+    # rows are counted from 0, as everywhere in the Python package (R: row 2)
+    with pytest.raises(PricingError, match=r"row 1 \(0-based\) has 'MERK' = MERCEDES"):
         add_groupings(b, gf, gsv, merge_vars=gmv)
     b.loc[1, "MERK_GR_F"] = "BMW_MERCEDES"
     ok = add_groupings(b, gf, gsv, merge_vars=gmv)
@@ -234,7 +235,7 @@ def test_a_grouped_column_already_in_data_is_kept_for_a_value_the_model_never_sa
     assert out.MERK_GR_F.tolist() == b.MERK_GR_F.tolist()
     # a value the model's data does know is still checked
     b.loc[0, "MERK_GR_F"] = "NISSAN"
-    with pytest.raises(PricingError, match="row 1 has 'MERK' = BMW"):
+    with pytest.raises(PricingError, match=r"row 0 \(0-based\) has 'MERK' = BMW"):
         add_groupings(b, g["g_freq"], None, merge_vars={"MERK": "MERK_GR_F"})
 
 
