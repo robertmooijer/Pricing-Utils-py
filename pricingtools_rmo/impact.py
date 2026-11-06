@@ -435,7 +435,9 @@ def premium_impact(data,
         legend=dict(orientation="h", y=-0.2),
         showlegend=spotlight_res is not None,
         plot_bgcolor="white", paper_bgcolor="white",
-        margin=dict(b=60, r=40))
+        # room above the plot for the median label, which otherwise runs
+        # into the title
+        margin=dict(t=60, b=60, r=40))
     set_config(fig, "impact")
 
     return Result(

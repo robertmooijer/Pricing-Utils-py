@@ -705,11 +705,15 @@ def screen_features(model, features=None, split=(0.6, 0.2, 0.2), max_depth=2,
     text = ["Gain: " + ("NA" if np.isnan(g) else "%.3f" % g)
             + (" · already in the model" if im else "")
             for g, im in zip(fp["Gain"].to_numpy(dtype=float), fp["InModel"])]
+    # A bar at or below zero runs to the left, so a label outside it lands
+    # on the feature names; it is written to the right of the zero line
+    # instead, in the empty half of the row
+    neg = ~np.isnan(pd_vals) & (pd_vals <= 0)
     fig = go.Figure()
     fig.add_trace(go.Bar(
         x=pd_vals, y=labels, orientation="h",
         marker=dict(color=[ta_blue if v > 0 else ta_muted for v in pd_vals]),
-        text=text,
+        text=text, textposition=["none" if n else "auto" for n in neg],
         hovertemplate=("<b>%{y}</b><br>PermDeviance: %{x:.2f}"
                        "<br>%{text}<extra></extra>")))
     fig.update_layout(
@@ -724,6 +728,10 @@ def screen_features(model, features=None, split=(0.6, 0.2, 0.2), max_depth=2,
         shapes=[dict(type="line", xref="x", yref="paper",
                      x0=0, x1=0, y0=0, y1=1,
                      line=dict(color=ta_muted, width=1, dash="dot"))],
+        annotations=[dict(x=0, y=lab, xref="x", yref="y", text=t,
+                          xanchor="left", xshift=6, showarrow=False,
+                          font=dict(color=ta_muted, size=12))
+                     for lab, t, n in zip(labels, text, neg) if n],
         hoverlabel=dict(bgcolor="white", font=dict(size=12)),
         plot_bgcolor="white", paper_bgcolor="white",
         margin=dict(l=140, b=60, r=40))

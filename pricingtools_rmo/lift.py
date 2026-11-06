@@ -536,7 +536,11 @@ def double_lift(data,
     # [RATE-11]
     # How much of that difference survives resampling the policies. The bins
     # stay as cut on the full data; every replicate reweights the policies
-    # within them and, with rebase, rebases again.
+    # within them and, with rebase, rebases again. The interval is the spread
+    # of the replicates laid around the point value, not their quantiles as
+    # such: mean |A/E - 1| grows with noise, and more for the model whose A/E
+    # sits near 1, so every replicate is pulled towards the old model and a
+    # percentile interval can sit beside its own point value.
     diff_ci = np.array([np.nan, np.nan])
     if n_boot > 0:
         def mad_of(a, p):
@@ -558,8 +562,9 @@ def double_lift(data,
             sims[i] = mad_of(sa, so) - mad_of(sa, sn)
         sims = sims[~np.isnan(sims)]
         if len(sims):
-            diff_ci = np.quantile(sims, [(1 - conf_level) / 2,
-                                         1 - (1 - conf_level) / 2])
+            diff_ci = mad_diff + np.quantile(sims - sims.mean(),
+                                             [(1 - conf_level) / 2,
+                                              1 - (1 - conf_level) / 2])
 
     # [RATE-09] [RATE-11]
     # A winner only where the interval excludes 0. Without a bootstrap the

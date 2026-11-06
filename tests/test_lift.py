@@ -434,6 +434,9 @@ def test_the_double_lift_names_a_winner_only_when_the_interval_excludes_0():
     assert clear.stats.mad_diff_ci[0] > 0
     assert clear.stats.mad_diff == clear.stats.mad_old - clear.stats.mad_new
     assert "): new</sup>" in clear.plot.layout.title.text
+    # the interval lies around its own point value (RATE-11)
+    lo, hi = clear.stats.mad_diff_ci
+    assert lo <= clear.stats.mad_diff <= hi
     # two models fitted on the same signal cannot be told apart; without
     # large losses behind it that is the verdict, not a warning
     close = no_warnings(double_lift, d, model_freq_new=m_good,
@@ -442,6 +445,8 @@ def test_the_double_lift_names_a_winner_only_when_the_interval_excludes_0():
     assert close.stats.winner == "inconclusive"
     assert close.stats.mad_diff_ci[0] <= 0
     assert close.stats.mad_diff_ci[1] >= 0
+    lo, hi = close.stats.mad_diff_ci
+    assert lo <= close.stats.mad_diff <= hi
     # without the bootstrap the point values decide, as before
     pt = double_lift(d, model_freq_new=m_good, model_freq_old=m_reg,
                      actual_col="AantalClaims", n_boot=0)

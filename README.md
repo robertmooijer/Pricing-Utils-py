@@ -1306,7 +1306,7 @@ print(h.cells[h.cells.gy == "Stad"].sort_values("gx").head(4))   # by age band
 ```
 
 The same view on the demo portfolio of the figures, where young city
-drivers are underpriced by about 20% and the same age group elsewhere is
+drivers are underpriced by 24% and the same age group elsewhere is
 overpriced:
 
 ![Residual heatmap](docs/figures/README-residual-heatmap.png)
@@ -2475,7 +2475,7 @@ And in `dl.stats`:
 | Value | What it tells you |
 |---|---|
 | `mad_new`, `mad_old` | average distance from 1.0 across the slices, lower is better calibrated |
-| `mad_diff`, `mad_diff_ci` | `mad_old - mad_new`, positive when the new tariff is closer to 1, and its bootstrap interval |
+| `mad_diff`, `mad_diff_ci` | `mad_old - mad_new`, positive when the new tariff is closer to 1, and its bootstrap interval: the spread of the replicates laid around the point value, which it therefore always contains |
 | `winner` | `"new"` or `"old"` only when that interval excludes 0; `"inconclusive"` when it does not; `"tie"` when the two are equal |
 | `rate_level_change` | how much more the new tariff collects overall, measured before any rebasing |
 | `weight_col` | what the slices hold equal amounts of |
