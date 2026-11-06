@@ -432,7 +432,16 @@ volume bar on a secondary axis where that applies, and a `y_range` (or
 share a scale. Categorical axes show markers only, never a line through
 categories. Python sets the order of a category axis explicitly, where R's
 plotly takes it from the factor. The modebar configuration R sets with
-`plotly::config()` is kept as `fig.pricing_config` (PY-06).
+`plotly::config()` is kept as `fig.pricing_config` (PY-06). What a layout
+leaves open is filled in with R's plotly defaults (`_core.py`,
+`r_layout_defaults()`, called from `set_config()` by every figure): margins
+`b=40, l=60, t=25, r=10` where the function sets none, a centred title and
+no Python template. Python's own "plotly" template would put the title on
+the left and a 100px gap above every plot.
+
+`demo/make_readme_figures.py` renders the README figures from these
+figures (headless Chrome or Edge, Pillow), as `demo/make_readme_figures.R`
+does in the R package.
 
 - **Pinned by.** `test_y_range.py`: `test_all_plot_functions_auto_scale_the_y_axis_by_default`,
   `test_all_plot_functions_honour_a_fixed_y_range`,

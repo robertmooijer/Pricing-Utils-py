@@ -27,6 +27,7 @@ Repository = "https://github.com/robertmooijer/Pricing-Utils-py"
 excel = ["openpyxl>=3.1"]
 screen = ["xgboost>=2.0"]
 dev = ["pytest>=8", "openpyxl>=3.1", "xgboost>=2.0"]
+figures = ["pillow>=10", "xgboost>=2.0"]
 
 [tool.setuptools]
 packages = ["pricingtools_rmo"]

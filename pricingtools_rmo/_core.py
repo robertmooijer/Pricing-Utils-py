@@ -70,11 +70,32 @@ def attach(fig, name, value):
     return fig
 
 
+# R's plotly fills in what a layout leaves open with plotly.js's defaults and
+# a margin of its own; Python's plotly fills it in from its "plotly" template
+# (title on the left, a 100px top margin, a grey grid). The same layout then
+# draws a wide gap above every plot. Every figure passes set_config() last,
+# so R's defaults are filled in here: what a function sets itself stays.
+_R_MARGIN = {"b": 40, "l": 60, "t": 25, "r": 10}
+
+
+def r_layout_defaults(fig):
+    lay = fig.layout
+    fig.update_layout(
+        template="none",
+        margin={k: (getattr(lay.margin, k) if getattr(lay.margin, k) is not None
+                    else v) for k, v in _R_MARGIN.items()})
+    if lay.title.x is None:
+        fig.update_layout(title_x=0.5)
+    return fig
+
+
 def set_config(fig, filename):
     """The modebar settings R attaches with plotly::config(). Python plotly
     passes config at render time, so it is kept on the figure as
     ``fig.pricing_config`` and used by fig.show / the report:
-    ``fig.show(config=fig.pricing_config)``."""
+    ``fig.show(config=fig.pricing_config)``. The layout gets R's plotly
+    defaults where the function left it open (r_layout_defaults())."""
+    r_layout_defaults(fig)
     cfg = {"displayModeBar": True,
            "modeBarButtonsToRemove": ["lasso2d", "select2d"],
            "toImageButtonOptions": {"format": "png", "filename": filename}}

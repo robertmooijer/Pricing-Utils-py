@@ -35,6 +35,7 @@ plotly mode bar.
 - [Installation](#installation)
 - [Data conventions](#data-conventions)
 - [Quick start example](#quick-start-example)
+- [Gallery](#gallery)
 - [Fitting models with `fit_glm()`](#fitting-models-with-fit_glm)
 - [Working with the results](#working-with-the-results)
 - [Function reference](#function-reference)
@@ -65,6 +66,7 @@ plotly mode bar.
 - [Input validation and warnings](#input-validation-and-warnings)
 - [Differences from the R package](#differences-from-the-r-package)
 - [Tests](#tests)
+- [Figures](#figures)
 - [Known limitations](#known-limitations)
 - [Technical documentation](TECHNICAL.md): every assumption and design
   decision, why it was made, and where it lives in the code. The Python code
@@ -275,6 +277,35 @@ pricing_report(m_freq, m_sev, dat,              # everything in one HTML
 
 In a notebook a figure displays itself when it is the last expression of a
 cell, so the `.show()` calls are only needed in a script.
+
+---
+
+## Gallery
+
+All figures in this README are real output of this Python package,
+generated from a simulated 40k-policy motor portfolio by
+`demo/make_readme_figures.py`. In practice they are interactive plotly
+figures (hover, zoom, toggle series); these are static screenshots.
+
+**One-way exploration**, observed frequency per level with exposure bars,
+split by accounting year:
+
+![One-way plot](docs/figures/README-oneway.png)
+
+**Actual vs expected**, observed and predicted frequency per quantile bin
+of a predictor, the core model-fit check:
+
+![Actual vs expected](docs/figures/README-actual-vs-expected.png)
+
+**Rating factors**, the multiplicative relativities that go into the
+tariff, relative to the base level (dotted line at 1.0):
+
+![Rating factors](docs/figures/README-rating-factors.png)
+
+**Interactions**, one curve per level of the group variable; here young
+drivers are materially worse in the Randstad than elsewhere:
+
+![Interaction plot](docs/figures/README-interaction.png)
 
 ---
 
@@ -539,6 +570,8 @@ print(agg_all(dat, "REGIO", by_year=False))
 print(agg_all(dat, "REGIO", by_year=True).head())
 ```
 
+![agg_all output](docs/figures/README-agg-all.png)
+
 Warnings are raised for missing values in the input columns and for groups
 with non-positive exposure, so data-quality issues are visible instead of
 silently averaged away:
@@ -592,6 +625,8 @@ make_plot(dat, "GEWICHT", "Severity", ta_gold, y_label="Average claim",
           display="facet", by_year=True).show()
 ```
 
+![One-way plot](docs/figures/README-oneway.png)
+
 ### `make_pdp()`
 
 **The question it answers:** *what does this one variable do to the price,
@@ -616,6 +651,8 @@ That is the difference from the observed line drawn beside it. The observed
 line groups the policies that really are 30 years old, and those people also
 differ in region, vehicle and everything else. The two lines answering
 different questions is normal, not a sign of misfit.
+
+![Partial dependence plot](docs/figures/README-pdp.png)
 
 **Reading the chart:**
 
@@ -854,6 +891,10 @@ plot_glm_predictor(m_freq, "LEEFTIJD", y_range=rng_y).show()
 plot_glm_predictor(m_freq, "REGIO", y_range=rng_y).show()
 ```
 
+| | |
+|---|---|
+| ![Fixed y-axis, age](docs/figures/README-yrange-age.png) | ![Fixed y-axis, region](docs/figures/README-yrange-regio.png) |
+
 Both plots then share one axis, so the stronger driver is visibly the
 stronger one. Note the trade-off: a shared axis flattens variables with a
 narrow spread of their own, so use auto-scaling when inspecting one variable
@@ -887,6 +928,8 @@ is written as R writes it (`Gamma`, `Negative Binomial(1.5)`).
 print(glm_diagnostics(m_freq, m_sev))
 ```
 
+![Diagnostics table](docs/figures/README-diagnostics.png)
+
 For Poisson/binomial families a **dispersion above 1.2 raises an
 overdispersion warning**: the point estimates are still consistent, but
 standard errors are understated, so consider a quasi-Poisson or negative
@@ -918,9 +961,12 @@ term's uncertainty is because of overlap with the rest:
 | 2.0 | its factors are twice as uncertain as they would be alone |
 | **3.0 or more** | flagged: the factors are not readable individually |
 
-On the R package's demo portfolio, two near-duplicate weight columns were
-flagged at 8.4, while every independent term sat at 1.0. The same situation
-on the quick-start portfolio:
+On the demo portfolio of the figures, two near-duplicate weight columns are
+flagged at 8.2, while every independent term sits at 1.0:
+
+![Collinearity table](docs/figures/README-collinearity.png)
+
+The same situation on the quick-start portfolio:
 
 ```python
 dat["GEWICHT_PROXY"] = dat.GEWICHT + rng.normal(0, 20, len(dat))   # a near-duplicate
@@ -1009,6 +1055,8 @@ plot_glm_residuals(m_freq, "REGIO").show()                         # error bars 
 
 **Returns** a plotly figure.
 
+![Binned residual plot](docs/figures/README-residuals.png)
+
 ### `plot_glm_qq()`
 
 **The question it answers:** *the model gets the average right, but does
@@ -1032,6 +1080,8 @@ percentile scores 90%. Do that for everyone and, if the model has the shape
 right, those scores should be spread perfectly evenly from 0 to 100%. The
 plot converts them to a scale where "perfectly even" is a straight diagonal
 line.
+
+![Q-Q plot of quantile residuals](docs/figures/README-qq.png)
 
 **Reading the chart:**
 
@@ -1109,9 +1159,11 @@ The chart has two axes, and the combination is the point:
   means the actual outcome was nothing like the predicted one.
 - **Bubble size, how much the fit actually moves** because of it.
 
-On the R package's demo portfolio, the big bubble on the far right is the
-20-tonne car. Note where it sits vertically: almost on the zero line, i.e.
-**apparently well fitted**. That is the trap this plot exists to expose, a
+![Influence plot](docs/figures/README-influence.png)
+
+The big bubble on the far right is the 20-tonne car, implanted in the demo
+portfolio of the figures. Note where it sits vertically: close to the middle
+line, i.e. **apparently well fitted**. That is the trap this plot exists to expose, a
 record that unusual drags the model towards itself until its own residual
 looks innocent. It hides from every residual check while quietly distorting
 the curve for everyone else.
@@ -1214,9 +1266,11 @@ print(detect_interactions(m_freq, vars=["LEEFTIJD", "REGIO", "KILOMETRAGE"],
 
 The quick-start portfolio has young drivers in the city simulated as extra
 risky, and `m_freq` has no term for it, so `LEEFTIJD` × `REGIO` comes out on
-top. On the R package's demo portfolio, missing the same kind of age ×
-region interaction, the true pair came out at `Z = 33.9` against 1.6 for the
-runner-up, and its worst cell was 27% mispriced on 3% of the exposure.
+top. On the demo portfolio of the figures, a frequency model missing the
+same kind of age × region interaction gives the true pair `Z = 30.1`, and
+its worst cell is 21% mispriced on 4% of the exposure:
+
+![Interaction scan](docs/figures/README-detect-interactions.png)
 
 **Returns** a DataFrame, strongest first: `VarX`, `VarY`, `Cells`,
 `Claims`, `Deviance`, `DF`, `Z`, `P`, `Method`, `Dispersion`, `MaxAE`,
@@ -1250,6 +1304,12 @@ h = plot_residual_heatmap(m_freq, "LEEFTIJD", "REGIO")
 h.show()
 print(h.cells[h.cells.gy == "Stad"].sort_values("gx").head(4))   # by age band
 ```
+
+The same view on the demo portfolio of the figures, where young city
+drivers are underpriced by about 20% and the same age group elsewhere is
+overpriced:
+
+![Residual heatmap](docs/figures/README-residual-heatmap.png)
 
 - Values come from the model's own rows, so they always align with the
   fitted values; both variables must be columns of the data the model was
@@ -1360,6 +1420,14 @@ below zero, a useful visual cue, not a verdict. `Gain` is xgboost's
 `total_gain` normalised to sum to 1, which is what R's `xgb.importance`
 reports as Gain. The sampling, the split and the boosting are random, so
 the numbers are not R's for the same `seed`.
+
+On the demo portfolio of the figures, with the vehicle weight left out of
+the baseline, a near-duplicate of it and a pure-noise column among the
+candidates: the weight and its proxy split the signal between them, the two
+variables already in the model add little, and the noise column is muted
+below zero:
+
+![Feature screening](docs/figures/README-screen-features.png)
 
 **Run time.** `tree_method="hist"` (the default, as in xgboost 2.0 and
 later) is the biggest lever on a large book: on 2,000,000 rows with 6
@@ -1639,6 +1707,13 @@ crashing the call. A term that bands a column, such as
 `cut(LEEFTIJD, c(17, 24, 40, 65, 99))`, is reported on its bands, and a
 logical column as a categorical variable with the levels `FALSE` and
 `TRUE`, `FALSE` as base (the model's reference).
+
+The rows for one categorical variable look like this (base row highlighted,
+thin row greyed out, as in the Excel export). Note the last level: 5 claims
+behind a premium factor of 1.15, so that factor is essentially noise,
+exactly what the `IsThin` flag is there to surface:
+
+![Rating table excerpt](docs/figures/README-rating-table.png)
 
 #### One rating factor, two columns
 
@@ -2199,6 +2274,14 @@ make_rating_plot(t_int, "LEEFTIJD:REGIO", metric="Premium").show()   # one curve
 
 **Returns** a plotly figure.
 
+The same variable as the rating-table excerpt above, markers only
+(categories are never connected by a line), with the thin level's markers
+faded:
+
+![Categorical rating plot](docs/figures/README-rating-plot-categorical.png)
+
+For a continuous variable and an interaction, see the [Gallery](#gallery).
+
 ### `model_lift()`
 
 **The question it answers:** *does my model actually tell cheap risks from
@@ -2229,6 +2312,8 @@ print(lift.gini, lift.gini_ci)
 lift.plot.show()
 lift.plot_lorenz.show()
 ```
+
+![Lift chart](docs/figures/README-lift.png)
 
 **Reading the chart.** The gold line is what the model predicted, the blue
 line what really happened.
@@ -2264,6 +2349,8 @@ candidate models on the same book; do not read an absolute value as good or
 bad, because it depends heavily on how heterogeneous the book is.
 `lift.plot_lorenz` draws the curve it comes from: the further it bows from
 the diagonal, the more the model separates.
+
+![Lorenz curve](docs/figures/README-lorenz.png)
 
 **How sure is that number?** Less than it looks. A Gini on raw losses
 moves with a handful of large claims: on a 16,000-policy holdout the 90%
@@ -2338,6 +2425,8 @@ the book by that ratio and cut it into 10 slices. Slice 1 holds the policies
 where the new tariff is most *below* the old one; slice 10 where it is most
 *above*. The middle slices are where the two roughly agree, uninteresting by
 design. Then plot how each tariff did in each slice.
+
+![Double lift chart](docs/figures/README-double-lift.png)
 
 Same arguments as [`premium_impact()`](#premium_impact): either two model
 sets, or one model set and a column holding your current premium.
@@ -2550,6 +2639,8 @@ contribution), `spotlight` (when given), `largest_increases` /
 `largest_decreases` (top-`n_show` dislocations) and `plot`
 (exposure-weighted histogram of premium changes with the median marked).
 
+![Premium impact histogram](docs/figures/README-premium-impact.png)
+
 **Who drives the change.** With `by`, each level gets `MeanChangePct` (what
 a policy in that level sees on average), `OldPremium`, `NewPremium`,
 `PremiumShare` (its share of the old premium), `TotalChangePct` (the
@@ -2594,6 +2685,8 @@ analysed, the subset appears as a second series on the histogram, and
 `imp.spotlight` reports its exposure share, mean and median change, and its
 contribution to the portfolio total. Filtering would remove exactly the
 context you need: that a segment moves +18% while the book moves +2%.
+
+![Premium impact with spotlight](docs/figures/README-premium-impact-spotlight.png)
 
 Its statistics are computed **after** the book-level rebase, because the
 rebase is a decision about the whole portfolio. Rebasing within the subset
@@ -2652,6 +2745,11 @@ path = export_rating_table(tbl, "rating_table.xlsx")
 print(path)                       # the normalised path of the written file
 ```
 
+What the Overview sheet holds, with the intercepts and base values the
+premium chain starts from:
+
+![Excel overview sheet](docs/figures/README-export-overview.png)
+
 **Returns** the normalised path of the written file. With
 `overwrite=False` an existing file is an error rather than replaced.
 
@@ -2701,6 +2799,11 @@ and the diagnostics block. The one-way severity reads `loss_col` as a
 
 **Returns** the normalised path of the written file, with a message saying
 where it went.
+
+The top of a generated report: title, both model formulas, a table of
+contents, and the diagnostics block:
+
+![Generated pricing report](docs/figures/README-pricing-report.png)
 
 ### Spline bases: `ns()`, `bs()`, `poly()`
 
@@ -3463,6 +3566,22 @@ Without `Rscript` they are skipped, not failed. The GitHub Actions workflow
 (`.github/workflows/tests.yml`) runs `pytest -m "not parity"` on every push
 to `main` and on pull requests, on Python 3.11 and 3.12, each with pandas
 2.x and pandas 3.x.
+
+## Figures
+
+`demo/make_readme_figures.py` regenerates the PNGs in `docs/figures/` used
+above, from a simulated 40k-policy motor portfolio with the structure of the
+R package's demo (a deliberately rare fuel type for the thin-cell flags, and
+a real age × region interaction). Each plotly figure is written to an HTML
+page and photographed by headless Chrome or Edge; tables are rendered in the
+style of the Excel export. It needs Pillow and a Chrome or Edge
+installation (set `CHROME` to its path if it is not found). Run it from the
+project root:
+
+```sh
+pip install -e ".[figures]"
+python demo/make_readme_figures.py
+```
 
 ## Known limitations
 
