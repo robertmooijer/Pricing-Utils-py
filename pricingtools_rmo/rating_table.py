@@ -430,7 +430,12 @@ def make_rating_table(model_freq=None, model_sev=None, data=None, grid_res=50,
                 xterm[bv] = code
 
     def var_is_cat(bv):
-        return bv in xlev_all or (bv in data.columns and _is_factor(data[bv]))
+        # [RT-14] a logical column is a two-level rating factor, FALSE first
+        # as in the model; read as continuous, its base became the most
+        # frequent value, the export wrote its levels as numbers and the
+        # rating plot drew a line
+        return bv in xlev_all or (bv in data.columns and (
+            _is_factor(data[bv]) or _is_lgl(data[bv])))
 
     def var_levels(bv):
         if bv in xlev_all:

@@ -1636,7 +1636,8 @@ Inline formula transformations such as `factor(BOEKJAAR)` and
 variable cannot be found in `data` are skipped with a warning rather than
 crashing the call. A term that bands a column, such as
 `cut(LEEFTIJD, c(17, 24, 40, 65, 99))`, is reported on its bands, and a
-logical column on `TRUE` and `FALSE`.
+logical column as a categorical variable with the levels `FALSE` and
+`TRUE`, `FALSE` as base (the model's reference).
 
 #### One rating factor, two columns
 
@@ -3378,10 +3379,6 @@ to R's. Everything that is not random matches R.
   the influence table's `Row` is the data's index label.
 - Messages keep R's English text; examples inside them use Python syntax,
   install hints say `pip install`.
-- `make_rating_table()`, `model_lift()`, `double_lift()`,
-  `premium_impact()` and `pricing_report()` check that each model is a
-  `GLMFit` and name the argument that is not; R's versions do not check
-  and fail on the first attribute they read.
 
 **Per function.**
 
@@ -3397,10 +3394,6 @@ to R's. Everything that is not random matches R.
   rounding, which differs between R and numpy, so a bin boundary can fall
   on a different policy. Totals per bin then differ slightly; with
   continuous predictors the bins are identical.
-- `add_groupings()` / `make_rating_table(merge_vars=)`: a grouped column
-  the caller put in the data keeps its value for a source value the model's
-  data never saw (a brand without claims). R stops there, which is a known
-  defect of the R version.
 - `screen_features()`: `Gain` is xgboost's `total_gain` normalised to sum
   to 1 (R's `xgb.importance` Gain). The baseline refit falls back to the
   supplied model, with R's warning, in one case more than R: a factor level
@@ -3410,13 +3403,20 @@ to R's. Everything that is not random matches R.
   part of the refit attempt.
 - `glm_collinearity()`: `Flag` is a nullable boolean column (`<NA>` for
   terms in an interaction).
-- A logical predictor in the rating table behaves as in R (Type
-  `"continuous"`, base = most frequent value); that R behaviour itself
-  looks like a defect worth fixing in both.
 - An offset that comes out of a rate is never evaluated, so data to be
   scored does not need its column (R evaluates it in order to subtract it,
   and stops when it cannot). An offset that stays in the rate is evaluated,
   and refused with R's message when it cannot be.
+
+**Found while porting, fixed in both packages.** Three defects of the R
+package came to light in the port and were fixed in R and Python alike: a
+grouped column the caller puts in the data now keeps its value for a source
+value the model's data never saw (R stopped, although its own message
+advised that column); a logical predictor in the rating table is a
+two-level categorical variable with `FALSE`, the model's reference, as
+base (it was read as continuous, with the most frequent value as base); and
+the rating table, lift, impact and report functions name a model argument
+that is not a fitted GLM.
 
 ---
 

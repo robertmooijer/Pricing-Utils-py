@@ -827,10 +827,10 @@ def test_columns_come_in_the_r_order(tbl, tbl2):
 
 
 def test_a_grouped_column_in_data_keeps_its_value_for_a_level_the_model_never_saw():
-    # Deliberate deviation from R: U.grouping_column keeps a grouped column
-    # the caller put in 'data' for source values the model's data never saw
-    # (R stops there). The level then gets an empty severity cell (RT-10),
-    # as any level the severity model was not fitted on does.
+    # [MV-05] U.grouping_column keeps a grouped column the caller put in
+    # 'data' for source values the model's data never saw. The level then
+    # gets an empty severity cell (RT-10), as any level the severity model
+    # was not fitted on does. (Python had this first; R was fixed to match.)
     dm = _sted_book(93)
     mf = fit_glm("AantalClaims ~ Stedelijkheid + LEEFTIJD + offset(log(Exposure))",
                  dm, family="poisson")
@@ -1058,17 +1058,48 @@ def test_a_logical_predictor_does_not_break_the_table(rv):
     g = tb[tb.Variable == "GARAGE"]
     assert set(g.Level) == {"FALSE", "TRUE"}
     assert not g.Factor_Frequency.isna().any()
-    # as in R, whose xlevels leave a logical out: listed on its two values,
-    # the more frequent one as base, and no number behind the level
-    assert (g.Type == "continuous").all()
-    assert g.LevelNum.isna().all()
+
+
+def test_a_logical_predictor_is_a_two_level_rating_factor_with_false_as_base(rv,
+                                                                             tmp_path):
+    # [RT-14] It used to be read as continuous (in R too, fixed with it):
+    # the base was the most frequent value rather than the model's
+    # reference, the export wrote the levels as numbers and the rating plot
+    # drew a line between FALSE and TRUE.
+    from pricingtools_rmo.export import export_rating_table
+    from pricingtools_rmo.rating_plot import make_rating_plot
+    d1 = rv.copy()
+    d1["GARAGE"] = d1.LEEFTIJD % 3 != 0                  # TRUE is the majority
+    mf = fit_glm("AantalClaims ~ REGIO + GARAGE + offset(log(Exposure))", d1,
+                 family="poisson")
+    tb = make_rating_table(mf, None, data=d1)
+    g = tb[tb.Variable == "GARAGE"]
+    assert g.Type.tolist() == ["categorical", "categorical"]
+    assert g.Level.tolist() == ["FALSE", "TRUE"]
     assert g.Level[g.IsBase].tolist() == ["FALSE"]
+    assert g.Factor_Frequency[g.Level == "TRUE"].iloc[0] == pytest.approx(
+        np.exp(mf.coef["GARAGE[T.True]"]), rel=1e-10)
+    # the largest level under base_level = "exposure", or any chosen one
+    tx = make_rating_table(mf, None, data=d1, base_level="exposure")
+    assert tx.Level[(tx.Variable == "GARAGE") & tx.IsBase].tolist() == ["TRUE"]
+    tb2 = make_rating_table(mf, None, data=d1, base={"GARAGE": True})
+    assert tb2.Level[(tb2.Variable == "GARAGE") & tb2.IsBase].tolist() == ["TRUE"]
+    with pytest.raises(PricingError, match="not a level of 'GARAGE'"):
+        make_rating_table(mf, None, data=d1, base={"GARAGE": "ja"})
+    # the premium rebuilds from the table
     nd = pd.DataFrame({"REGIO": pd.Categorical(["West"],
                                                categories=rv.REGIO.cat.categories),
                        "GARAGE": [True], "Exposure": [1.0]})
     f = lambda v, lv: tb.Factor_Frequency[(tb.Variable == v) & (tb.Level == lv)].iloc[0]
     assert tb.attrs["intercept_frequency"] * f("REGIO", "West") * f("GARAGE", "TRUE") \
         == pytest.approx(mf.predict(nd)[0], rel=1e-10)
+    # the rating plot draws bars, the export writes the levels as text
+    assert "bar" in [t.type for t in make_rating_plot(tb, "GARAGE").data]
+    openpyxl = pytest.importorskip("openpyxl")
+    fx = str(tmp_path / "garage.xlsx")
+    export_rating_table(tb, fx)
+    ws = openpyxl.load_workbook(fx)["GARAGE"]
+    assert [ws.cell(row=r, column=1).value for r in (2, 3)] == ["FALSE", "TRUE"]
 
 
 def test_trim_does_not_take_exposure_out_of_the_slices_of_a_group_variable(rv):

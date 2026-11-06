@@ -57,10 +57,7 @@ General
 - Row numbers are 0-based (`premium_impact().policy.Row`, the row
   `add_groupings()` names); the influence table's `Row` is the data's
   index label.
-- Every function that takes a model checks that it is a `GLMFit` and names
-  the argument that is not; R's rating table, lift, impact and report
-  functions do not check. A formula that cannot be read is a
-  `FormulaError`, a `PricingError`.
+- A formula that cannot be read is a `FormulaError`, a `PricingError`.
 
 Per function
 - `make_plot(display="facet")` is built with plotly subplots, not
@@ -76,10 +73,6 @@ Per function
   which differs between R and numpy, so a bin boundary can fall on a
   different policy. Totals per bin then differ slightly; with continuous
   predictors the bins are identical.
-- `add_groupings` / `make_rating_table(merge_vars=)` [MV-05]: a grouped
-  column the caller put in the data keeps its value for a source value the
-  model's data never saw (a brand without claims). R stops there, which is
-  a known defect of the R version.
 - `screen_features`: Gain is xgboost's `total_gain` normalised to sum to 1
   (R's `xgb.importance` Gain). [SCR-03] The baseline refit falls back to
   the supplied model, with R's warning, in one case more than R: a factor
@@ -89,12 +82,19 @@ Per function
   Python treats the predictions as part of the refit attempt.
 - `glm_collinearity`: `Flag` is a nullable boolean column (`<NA>` for terms
   in an interaction).
-- A logical predictor in the rating table behaves as in R (Type
-  "continuous", base = most frequent value); that R behaviour itself looks
-  like a defect worth fixing in both.
 - `fit_glm` cannot fit a Gamma model to a constant response (statsmodels
   refuses the perfect fit, R returns deviance 0). Never a pricing case.
 - [OFF-03] An offset that comes out of a rate is never evaluated, so data
   to be scored does not need its column (R evaluates it in order to
   subtract it, and stops when it cannot). An offset that stays in the rate
   is evaluated and refused with R's message when it cannot be.
+
+Found while porting, and fixed in both packages (November 2026)
+- [MV-05] A grouped column the caller put in the data keeps its value for
+  a source value the model's data never saw (a brand without claims);
+  R stopped there, although its own message advised exactly that column.
+- [RT-14] A logical predictor in the rating table is a two-level
+  categorical variable with `FALSE` (the model's reference) as base; it was
+  read as continuous, with the most frequent value as base.
+- The rating table, lift, impact and report functions check that each
+  model is a glm (`GLMFit`) and name the argument that is not.

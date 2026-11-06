@@ -106,9 +106,9 @@ def _txt(v):
 
 def check_models(fn, **models):
     """Every model given must be a GLMFit, as the plot and diagnostic
-    functions already require. R's rating table, lift, impact and report
-    functions do not check and fail on the first attribute they read; here
-    they say what is wrong."""
+    functions already require: the port of R's .check_models(), for the
+    rating table, lift, impact and report functions, which otherwise fail on
+    the first attribute they read."""
     from .model import GLMFit
     for name, m in models.items():
         if m is not None and not isinstance(m, GLMFit):
@@ -884,7 +884,7 @@ def grouping_column(data, pv, a, model_freq, model_sev, fn):
             if have:
                 # [MV-05] a column the caller supplied keeps its value where
                 # the model's data cannot check it
-                # [PY-07] R stops here; the deviation is in TECHNICAL.md
+                # [PY-07] Python had this first; R was fixed to match
                 pass
             else:
                 stop(fn, ": the value(s) ", ", ".join(miss[:5]),

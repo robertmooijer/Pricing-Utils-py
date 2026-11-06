@@ -224,9 +224,10 @@ def test_the_input_is_left_alone(g):
 
 
 def test_a_grouped_column_already_in_data_is_kept_for_a_value_the_model_never_saw(g):
-    # Deliberate deviation from R: a grouped column the caller supplies keeps
-    # its value where the model's data cannot check it (R stops there). The
-    # value is then the caller's responsibility; predict() will name it.
+    # [MV-05] A grouped column the caller supplies keeps its value where the
+    # model's data cannot check it: the remedy the error without the column
+    # gives. The value is then the caller's responsibility; predict() will
+    # name it. (Python had this first; R was fixed to match.)
     b = new_pf()
     b.loc[2, "MERK"] = "TESLA"
     b["MERK_GR_F"] = ["BMW_MERCEDES", "BMW_MERCEDES", "TESLA", "TOYOTA",

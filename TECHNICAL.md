@@ -932,20 +932,29 @@ register entry here is written so it can be read on its own.
 - **Pinned by.** `test_rating_table.py`: `test_claims_without_payment_are_pointed_out`;
   `test_lift.py`: `test_claims_without_payment_are_pointed_out`.
 
-#### RT-14 A logical predictor stays logical
+#### RT-14 A logical predictor is a two-level categorical variable
 
-- **Decision.** Grid values for a logical column are coerced back to
-  `True` / `False`. In Python `coerce_like()` returns a nullable boolean and
-  `GLMFit._align()` turns it into plain booleans patsy can read.
-- **Why.** R's `predict()` refuses a character where the model was fitted
-  on a logical, so a column such as `GARAGE = TRUE` broke the table.
-- **Where.** `_utils.py`, `coerce_like()`; `rating_table.py`, the
-  xlevels-by-column block of `make_rating_table()` (a logical term is left
-  out of the levels, as R's `xlevels` leave it out), `grid_of()`;
+- **Decision.** A logical column is reported as a categorical variable
+  with the levels `FALSE` and `TRUE`, `FALSE` first, so it is the base by
+  default (`base_level="exposure"` and `base` choose as for any factor).
+  Its grid values go into `predict()` as `True` / `False`: `coerce_like()`
+  returns a nullable boolean and `GLMFit._align()` turns it into plain
+  booleans patsy can read.
+- **Why.** The model codes a logical as `GARAGE[T.True]` against `False`
+  (R: `GARAGETRUE`), so `FALSE` is the model's reference. R's `xlevels`
+  leave a logical out (and so does the xlevels-by-column block here, to
+  read a term as R does), and reading the column as continuous made the
+  base the most frequent value, wrote the levels to Excel as numbers and
+  drew the rating plot as a line between FALSE and TRUE.
+- **Where.** `rating_table.py`, `var_is_cat()`, the xlevels-by-column block
+  of `make_rating_table()`, `grid_of()`; `_utils.py`, `coerce_like()`;
   `model.py`, `GLMFit._align()`.
-- **Pinned by.** `test_rating_table.py`: `test_a_logical_predictor_does_not_break_the_table`;
+- **Pinned by.** `test_rating_table.py`: `test_a_logical_predictor_does_not_break_the_table`,
+  `test_a_logical_predictor_is_a_two_level_rating_factor_with_false_as_base`;
   `parity/test_parity_rating_table.py`: `test_rating_table_parity_covers_what_it_should`
   (table C holds a logical predictor).
+- **History.** Until November 2026 both packages read a logical as
+  continuous; found while porting, fixed in both.
 
 #### RT-15 The accounting year sits at its latest level
 
@@ -1054,13 +1063,14 @@ register entry here is written so it can be read on its own.
 
 - **Decision.** If the data has the grouped column, every row is compared
   with what the model's data says, and a disagreement is an error with the
-  row and the values. Python differs in one case: for a source value the
-  model's data never saw, the caller's value is kept, where R stops (PY-07).
+  row and the values. A source value the model's data never saw cannot be
+  compared, and keeps the caller's value (PY-07).
 - **Why.** A wrong mapping in a source system would otherwise be scored.
 - **Where.** `_utils.py`, `grouping_column()`.
 - **Pinned by.** `test_groupings.py`: `test_anything_that_would_be_a_guess_is_refused`,
   `test_a_grouped_column_already_in_data_is_kept_for_a_value_the_model_never_saw`
-  (the check on the values the model's data does know).
+  (the check on the values the model's data does know);
+  `parity/test_parity_rating_table.py`: `test_rating_table_matches_r` (table D).
 
 #### MV-06 Categorical or continuous source
 
@@ -2147,8 +2157,8 @@ register entry here is written so it can be read on its own.
 - **Consequence.** A model fitted elsewhere cannot be passed in; refit it
   with `fit_glm()`. Every function that takes a model checks that it is a
   `GLMFit` and names the argument that is not (`check_models()` in
-  `_utils.py` for the rating table, lift, impact and report functions, which
-  R does not check). DATA-05 and DATA-06 are moot. `fit_glm()` cannot fit a
+  `_utils.py` for the rating table, lift, impact and report functions, the
+  port of R's `.check_models()`). DATA-05 and DATA-06 are moot. `fit_glm()` cannot fit a
   Gamma model to a constant response (statsmodels refuses the perfect fit,
   where R returns a deviance of 0), which is never a pricing case.
 - **History (Python port).** Until the README examples were verified, an
@@ -2313,22 +2323,24 @@ register entry here is written so it can be read on its own.
   the caller's value is kept for those rows. Every value the model's data
   does know is still checked, and a disagreement is still an error
   (MV-05). Without the column in `data`, such a value is still an error
-  (MV-07). This is a deliberate deviation from the R package, which stops.
-- **Why.** R stops with a message that advises putting the grouped column
-  in `data` yourself; with the column there it stops anyway, so the advice
-  cannot be followed. The kept value is not a guess by the package: the
-  caller states it, and the model's data has nothing to contradict it. The
-  rating table then shows the level as an empty cell (RT-10), as any level
-  the severity model was not fitted on. The R behaviour is a known defect
-  of the R version.
+  (MV-07). The R package does the same since November 2026.
+- **Why.** The error without the column advises putting the grouped column
+  in `data` yourself, so doing that has to work. The kept value is not a
+  guess by the package: the caller states it, and the model's data has
+  nothing to contradict it. The rating table then shows the level as an
+  empty cell (RT-10), as any level the severity model was not fitted on.
 - **Where.** `_utils.py`, `grouping_column()`.
-- **Evidence.** None measured. The parity test of the rating table leaves
-  this case out on purpose.
+- **Evidence.** *Parity:* table D of the rating-table parity test, a
+  grouped column in `data` for a level the severity data never saw, matches
+  R to 1e-14 in its factors, the empty severity cell included.
 - **Pinned by.** `test_groupings.py`:
   `test_a_grouped_column_already_in_data_is_kept_for_a_value_the_model_never_saw`;
   `test_rating_table.py`:
-  `test_a_grouped_column_in_data_keeps_its_value_for_a_level_the_model_never_saw`.
-- **Open point.** Fix the R package to match, so the two agree again.
+  `test_a_grouped_column_in_data_keeps_its_value_for_a_level_the_model_never_saw`;
+  `parity/test_parity_rating_table.py`: `test_rating_table_matches_r`.
+- **History.** The port had this first; R stopped even with the column in
+  `data`, so its own advice could not be followed. R was fixed to match in
+  November 2026.
 
 #### PY-08 Parity with R is measured, not assumed
 
@@ -2430,9 +2442,7 @@ Same data and formulas through both packages; R fitted with a tight
   Gaussian's default link is log. Families: poisson, quasipoisson, gamma,
   gaussian, binomial, inverse.gaussian, tweedie, negbin. Prior weights
   given as an array are refused by a refit and on new data, as R's
-  `update()` stops on them; a column name follows the rows. Every function
-  that takes a model checks that it is a `GLMFit`, where R's rating table,
-  lift, impact and report functions do not check.
+  `update()` stops on them; a column name follows the rows.
 - **R formula syntax** is supported as listed in PY-02. Not supported: `.`,
   the separate `offset =` argument (write the offset in the formula), and
   `na.exclude` (Python always fits as `na.omit`, so DATA-06 is moot).
@@ -2472,10 +2482,6 @@ Same data and formulas through both packages; R fitted with a tight
   rounding, which differs between R and numpy, so a bin boundary can fall
   on a different policy. Totals per bin then differ slightly; with
   continuous predictors the bins are identical (RATE-06).
-- `add_groupings()` and `make_rating_table(merge_vars=)`: a grouped column
-  the caller put in the data keeps its value for a source value the model's
-  data never saw. R stops there, which is a known defect of the R version
-  (MV-05, PY-07).
 - `screen_features()`: `Gain` is xgboost's `total_gain` normalised to sum
   to 1 (R's `xgb.importance` Gain) (SCR-05). The baseline refit falls back
   to the supplied model, with R's warning, in one case more than R: a
@@ -2486,9 +2492,6 @@ Same data and formulas through both packages; R fitted with a tight
   (SCR-03).
 - `glm_collinearity()`: `Flag` is a nullable boolean column (`<NA>` for
   terms in an interaction) (DIAG-02, DIAG-07).
-- A logical predictor in the rating table behaves as in R: Type
-  "continuous", base = the most frequent value (RT-14). That R behaviour
-  itself looks like a defect worth fixing in both (section 5).
 - `fit_glm()` cannot fit a Gamma model to a constant response (statsmodels
   refuses the perfect fit, R returns deviance 0). Never a pricing case
   (PY-01).
@@ -2497,13 +2500,29 @@ Same data and formulas through both packages; R fitted with a tight
   stays in the rate is evaluated and refused with R's message when it
   cannot be.
 
+### 4.4 Found while porting, fixed in both packages
+
+Three defects of the R package came to light in the port and were fixed in
+R and Python alike in November 2026, each pinned by tests on both sides:
+
+- A grouped column the caller puts in `data` keeps its value for a source
+  value the model's data never saw; R stopped, although its own message
+  advised that column (MV-05, PY-07; parity table D).
+- A logical predictor in the rating table is a two-level categorical
+  variable with `FALSE`, the model's reference, as base; it was read as
+  continuous, with the most frequent value as base, numeric levels in the
+  export and a line in the rating plot (RT-14).
+- The rating table, lift, impact and report functions check that each
+  model is a fitted GLM and name the argument that is not; they failed on
+  the first attribute they read (PY-01, R's `.check_models()`).
+
 ---
 
 ## 5. Known limitations and open points
 
 These are known, deliberate or not yet addressed. Each says what to do
-about it today. Items 1 to 13 are the R package's and hold for Python too;
-items 14 to 18 are the port's own.
+about it today. Items 1 to 12 are the R package's and hold for Python too;
+items 13 to 16 are the port's own.
 
 1. **The bootstrap intervals hold the models fixed** (RATE-11). They
    resample policies, not the fit, so an in-sample interval is narrower
@@ -2544,23 +2563,16 @@ items 14 to 18 are the port's own.
     binomial with at most 20 distinct trial counts, Gamma, Gaussian. Other
     families are shown uncentred with a warning; use Pearson residuals
     there.
-13. **A logical predictor in the rating table is reported as continuous**,
-    with the most frequent value as its base, in both packages (RT-14).
-    The R record describes the grid values staying logical but not this;
-    it looks like a defect worth fixing in both. Until then, a 0/1 or
-    text column gives the usual categorical block.
-14. **Random results differ from R's for the same seed** (PY-05). Compare
+13. **Random results differ from R's for the same seed** (PY-05). Compare
     random outputs between the packages by their spread, not draw for
     draw.
-15. **A grouped column in `data` is kept for a value the model never saw**
-    (PY-07), where R stops. Fix the R package to match.
-16. **`DataFrame.attrs` is experimental in pandas** (PY-06) and does not
+14. **`DataFrame.attrs` is experimental in pandas** (PY-06) and does not
     survive every operation. Read the intercepts from the table as
     `make_rating_table()` returns it.
-17. **Lift bins can differ from R's with many tied predictions** (RATE-06,
+15. **Lift bins can differ from R's with many tied predictions** (RATE-06,
     section 4.3). Totals per bin differ slightly; with continuous predictors
     the bins are identical.
-18. **A few plot strings hold non-ASCII characters literally** (CONV-06),
+16. **A few plot strings hold non-ASCII characters literally** (CONV-06),
     where the porting guide asks for `\u` escapes. Harmless; change them
     when the module is next touched.
 
@@ -2609,7 +2621,7 @@ The R side needs the R package pricingtoolsRmO and `jsonlite` installed;
 | File | Compares with R |
 |---|---|
 | `parity/test_parity_fit.py` | `fit_glm()` against `glm()` (Poisson, quasi-Poisson, Gamma with weights, Gaussian) and `MASS::glm.nb()`: fitted values, deviance, null deviance, AIC, dispersion, standard errors, theta, and predictions on new data with NA from `cut()` and extrapolation past the `ns()` knots |
-| `parity/test_parity_rating_table.py` | three rating tables: `ns()`, the latest year as base, interactions of every type, `merge_vars`, a chosen base, a trimmed grid, `base_level="exposure"`, a `cut()` term, a logical predictor |
+| `parity/test_parity_rating_table.py` | four rating tables: `ns()`, the latest year as base, interactions of every type, `merge_vars`, a chosen base, a trimmed grid, `base_level="exposure"`, a `cut()` term, a logical predictor, a grouped column in `data` for a level the severity data never saw |
 | `parity/test_parity_impact_lift.py` | `premium_impact()`, `model_lift()`, `double_lift()` with an exposure and a BM offset, bootstraps off |
 | `parity/test_parity_plots.py` | `agg_all()`, `make_plot()`, `plot_glm_predictor()`, `make_pdp()`, `make_rating_plot()`: the values behind the traces |
 | `parity/test_parity_diagnostics.py` | `glm_diagnostics()`, `glm_collinearity()`, `plot_glm_residuals()`, heatmap cells, the deterministic columns of `detect_interactions()`, `plot_glm_influence()`, Gamma quantile residuals |
